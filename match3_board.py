@@ -31,7 +31,6 @@ class Match3Board:
                 result += f"{chr(self.board[row][col] + ord('a')):>3}"
             if row != self.rows - 1:
                 result += "\n"
-        result += "\n"
         return result
 
     def clear(self, points: list[tuple[int, int]] = None) -> None:
@@ -41,7 +40,7 @@ class Match3Board:
             for (x, y) in points:
                 self.board[y][x] = self.empty
 
-    def populate(self, cols: tuple[int, int] = None, rows: tuple[int, int] = None) -> int:
+    def populate(self, cols: tuple[int, int] = None, rows: tuple[int, int] = None, no_valid_play_check: bool = True) -> int:
         if cols is None:
             cols = (0, self.cols)
         if rows is None:
@@ -64,11 +63,11 @@ class Match3Board:
                     # If after checking all possible values no value was found that didn't result in a match3 group, re-run.
                     if not len(values_left):
                         self.board = backup_board
-                        return self.populate(cols, rows)
+                        return self.populate(cols, rows, no_valid_play_check)
         # Check that the board has at least one possible play, if not, re-run.
-        if len(self.find_a_play()) == 0:
+        if no_valid_play_check and len(self.find_a_play()) == 0:
             self.board = backup_board
-            return self.populate(cols, rows)
+            return self.populate(cols, rows, no_valid_play_check)
         return empty_count
 
     def out_of_bounds(self, col: int, row: int) -> bool:
