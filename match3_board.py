@@ -73,7 +73,7 @@ class Match3Board:
     def out_of_bounds(self, col: int, row: int) -> bool:
         return col < 0 or row < 0 or col >= self.cols or row >= self.rows
 
-    def get_group(self, col: int, row: int, group: tuple[tuple[int, int], ...] = None) -> tuple[tuple[int, int], ...]:
+    def get_group(self, col: int, row: int, group: list[tuple[int, int]] = None) -> list[tuple[int, int]]:
         if group is None:
             group = list()
         for (offset_x, offset_y) in ((-1, 0), (1, 0), (0, -1), (0, 1)):
@@ -87,7 +87,7 @@ class Match3Board:
                 continue
             group.append((neigh_x, neigh_y))
             group = list(self.get_group(neigh_x, neigh_y, group))
-        return tuple(group)
+        return group
 
     def are_elems_contiguous(self, l: list[int]) -> bool:
         l.sort()
@@ -96,7 +96,7 @@ class Match3Board:
                 return False
         return True
 
-    def filter_group(self, group: tuple[tuple[int, int], ...]) -> tuple[tuple[int, int], ...]:
+    def filter_group(self, group: list[tuple[int, int]]) -> list[tuple[int, int]]:
         points_in_line = dict()
         for (col, row) in group:
             points_in_line[f"x={col}"] = points_in_line.get(f"x={col}", list()) + [(col, row)]
@@ -110,7 +110,7 @@ class Match3Board:
                     for point in points:
                         if point not in filtered_group:
                             filtered_group.append(point)
-        return tuple(filtered_group)
+        return filtered_group
 
     def swap(self, point1: tuple[int, int], point2: tuple[int, int]) -> None:
         (x1, y1), (x2, y2) = point1, point2
@@ -118,7 +118,7 @@ class Match3Board:
         self.board[y1][x1] = self.board[y2][x2]
         self.board[y2][x2] = tmp
 
-    def find_a_play(self) -> tuple[tuple[tuple[int, int], tuple[int, int]], tuple[tuple[tuple[int, int], ...], ...]]:
+    def find_a_play(self) -> tuple[tuple[tuple[int, int], tuple[int, int]], list[list[tuple[int, int]]]]:
         for row in range(self.rows):
             for col in range(self.cols):
                 for (x, y) in ((-1, 0), (1, 0), (0, -1), (0, 1)):
@@ -133,7 +133,6 @@ class Match3Board:
                         group = self.filter_group(self.get_group(x, y))
                         if len(group) > 0:
                             groups.append(group)
-                    groups = tuple(groups)
                     self.swap(*swap_points)
                     if len(groups) > 0:
                         return (swap_points, groups)
@@ -145,7 +144,7 @@ class Match3Board:
                 if self.board[row + 1][col] == self.empty:
                     self.swap((col, row), (col, row + 1))
 
-    def get_valid_groups(self) -> tuple[tuple[tuple[int, int], ...], ...]:
+    def get_valid_groups(self) -> list[list[tuple[int, int]]]:
         groups = list()
         for row in range(self.rows):
             for col in range(self.cols):
@@ -155,10 +154,9 @@ class Match3Board:
                 if len(group) > 0:
                     group.sort(key=lambda l: l[1])
                     group.sort(key=lambda l: l[0])
-                    group = tuple(group)
                     if group not in groups:
                         groups.append(group)
-        return tuple(groups)
+        return groups
 
     def is_full(self) -> bool:
         for row in range(self.rows):
