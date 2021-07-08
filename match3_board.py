@@ -18,7 +18,10 @@ class Match3Board:
         self.values = tuple([i for i in range(num_values)])
         self.board = None
         self.clear()
-        self.populate()
+        try:
+            self.populate()
+        except RecursionError:
+            raise RuntimeError("Couldn't generate the the board.")
 
     def __str__(self) -> str:
         result = "  "
@@ -40,18 +43,17 @@ class Match3Board:
             for (x, y) in points:
                 self.board[y][x] = self.empty
 
-    def populate(self, cols: tuple[int, int] = None, rows: tuple[int, int] = None, no_valid_play_check: bool = True) -> int:
+    def populate(self, cols: tuple[int, int] = None, rows: tuple[int, int] = None, no_valid_play_check: bool = True) -> list[tuple[int, int]]:
+        populated = list()
         if cols is None:
             cols = (0, self.cols)
         if rows is None:
             rows = (0, self.rows)
         backup_board = copy.deepcopy(self.board)
-        empty_count = 0
         for row in range(rows[0], rows[1]):
             for col in range(cols[0], cols[1]):
                 # If the current space is empty, place a new random value.
                 if self.board[row][col] == self.empty:
-                    empty_count += 1
                     values_left = list(self.values)
                     while len(values_left):
                         value = random.choice(values_left)
@@ -61,14 +63,15 @@ class Match3Board:
                         if not self.filter_group(self.get_group(col, row)):
                             break
                     # If after checking all possible values no value was found that didn't result in a match3 group, re-run.
-                    if not len(values_left):
+                    if len(values_left) == 0:
                         self.board = backup_board
                         return self.populate(cols, rows, no_valid_play_check)
+                    populated.append((col, row))
         # Check that the board has at least one possible play, if not, re-run.
         if no_valid_play_check and len(self.find_a_play()) == 0:
             self.board = backup_board
             return self.populate(cols, rows, no_valid_play_check)
-        return empty_count
+        return populated
 
     def out_of_bounds(self, col: int, row: int) -> bool:
         return col < 0 or row < 0 or col >= self.cols or row >= self.rows
@@ -138,11 +141,14 @@ class Match3Board:
                         return (swap_points, groups)
         return tuple()
 
-    def shift_down(self) -> None:
+    def shift_down(self) -> list[tuple[int, int]]:
+        floating = list()
         for row in reversed(range(0, self.rows - 1)):
             for col in reversed(range(0, self.cols)):
                 if self.board[row + 1][col] == self.empty:
+                    floating.append((col, row + 1))
                     self.swap((col, row), (col, row + 1))
+        return floating
 
     def get_valid_groups(self) -> list[list[tuple[int, int]]]:
         groups = list()

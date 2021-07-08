@@ -12,15 +12,15 @@ class MouseState(Enum):
 class Match3GUI:
     colors = [
         [128,  0,  0],  # 800000 Dark Red
-        [172,172,255],  # ACACFF Light Blue
+        [  0,  0,128],  # 000080 Dark Blue
         [255,255,  0],  # FFFF00 Yellow
         [  0,128,  0],  # 008000 Green
         [ 84, 84, 84],  # 545454 Grey
-        [  0,  0,128],  # 000080 Dark Blue
-        [192,255,128],  # C0FF80 Pale Green-Yellow
-        [ 48,192,192],  # 30C0C0 Greyed Cyan
         [192,  0,192],  # C000C0 Purple-Magenta
+        [ 48,192,192],  # 30C0C0 Greyed Cyan
+        [192,255,128],  # C0FF80 Pale Green-Yellow
         [255, 64, 64],  # FF4040 Light Red
+        [172,172,255],  # ACACFF Light Blue
         [255,255,255],  # FFFFFF White
         [  0,  0,  0],  # 000000 Black
     ]
@@ -28,11 +28,15 @@ class Match3GUI:
     background_color = (255, 255, 255)
     min_width = 500
     min_height = 500
-    ani_time = 250
+    ani_time = 150
     target_fps = 60
     flags = pygame.RESIZABLE
 
     def __init__(self, side_len: int = 13) -> None:
+        if side_len < 5:
+            raise ValueError("Minimum size is 5.")
+        if side_len > 13:
+            raise ValueError("Maximum size is 13.")
         self.board = Match3Board(side_len, side_len, side_len-1)
         self.size = self.width, self.height = self.min_width, self.min_height
         self.circle_radius = self.width / self.board.cols / 2
@@ -60,48 +64,48 @@ class Match3GUI:
         c_x, c_y = circle_center
         return (x - c_x)**2 + (y - c_y)**2 < r**2
 
-    def animate_swap(self, board_pos1: tuple[int, int], board_pos2: tuple[int, int]) -> None:
-        board_pos = (board_pos1, board_pos2)
-        win_pos = (list(self.board_pos_to_win_pos(*board_pos1)), list(self.board_pos_to_win_pos(*board_pos2)))
-        curr_pos = [list(win_pos[0]), list(win_pos[1])]
-        total_dist = (
-            [win_pos[1][0] - win_pos[0][0], win_pos[1][1] - win_pos[0][1]],  # [dst_p1_x - src_p1_x, dst_p1_y - src_p1_y]
-            [win_pos[0][0] - win_pos[1][0], win_pos[0][1] - win_pos[1][1]],  # [dst_p2_x - src_p2_x, dst_p2_y - src_p2_y]
+    def animate_swap(self, board_point1: tuple[int, int], board_point2: tuple[int, int]) -> None:
+        board_points = (board_point1, board_point2)
+        win_points = (list(self.board_pos_to_win_pos(*board_points[0])), list(self.board_pos_to_win_pos(*board_points[1])))
+
+        target_dist = (
+            [win_points[1][0] - win_points[0][0], win_points[1][1] - win_points[0][1]],  # [dst_p1_x - src_p1_x, dst_p1_y - src_p1_y]
+            [win_points[0][0] - win_points[1][0], win_points[0][1] - win_points[1][1]],  # [dst_p2_x - src_p2_x, dst_p2_y - src_p2_y]
         )
-        #print(f"{board_pos=} {win_pos=} {curr_pos=} {total_dist=}")
+        curr_pos = [list(win_points[0]), list(win_points[1])]
 
         curr_ani_time = 0
         curr_time = pygame.time.get_ticks()
         ani_time_start = curr_time
 
-        while curr_pos[0] != win_pos[1] and curr_pos[1] != win_pos[0]:  # curr_p1 != dst_p1 and curr_p2 != dst_p2
+        while curr_pos[0] != win_points[1] or curr_pos[1] != win_points[0]:  # curr_p1 != dst_p1 or curr_p2 != dst_p2
             if self.process_events():
-                win_pos = (list(self.board_pos_to_win_pos(*board_pos1)), list(self.board_pos_to_win_pos(*board_pos2)))
-                total_dist = (
-                    [win_pos[1][0] - win_pos[0][0], win_pos[1][1] - win_pos[0][1]],  # [dst_p1_x - src_p1_x, dst_p1_y - src_p1_y]
-                    [win_pos[0][0] - win_pos[1][0], win_pos[0][1] - win_pos[1][1]],  # [dst_p2_x - src_p2_x, dst_p2_y - src_p2_y]
+                win_points = (list(self.board_pos_to_win_pos(*board_points[0])), list(self.board_pos_to_win_pos(*board_points[1])))
+                target_dist = (
+                    [win_points[1][0] - win_points[0][0], win_points[1][1] - win_points[0][1]],  # [dst_p1_x - src_p1_x, dst_p1_y - src_p1_y]
+                    [win_points[0][0] - win_points[1][0], win_points[0][1] - win_points[1][1]],  # [dst_p2_x - src_p2_x, dst_p2_y - src_p2_y]
                 )
+
             self.clock.tick(self.target_fps)
             self.screen.fill(self.background_color)
-            self.draw_board(no_draw_pts=board_pos)
+            self.draw_board(no_draw_pts=board_points)
 
             curr_time = pygame.time.get_ticks()
             curr_ani_time = curr_time - ani_time_start
 
             for p_i in reversed(range(2)):
                 # Calculate the new position
-                src_pos = win_pos[p_i]
-                dst_pos = win_pos[int(not p_i)]
-                partial_dist = (total_dist[p_i][0] * curr_ani_time / self.ani_time, total_dist[p_i][1] * curr_ani_time / self.ani_time)
-                curr_pos[p_i] = [src_pos[0] + partial_dist[0], src_pos[1] + partial_dist[1]]
+                src_pos = win_points[p_i]
+                dst_pos = win_points[int(not p_i)]
+                curr_dist = (target_dist[p_i][0] * curr_ani_time / self.ani_time, target_dist[p_i][1] * curr_ani_time / self.ani_time)
+                curr_pos[p_i] = [src_pos[0] + curr_dist[0], src_pos[1] + curr_dist[1]]
                 curr_pos[p_i] = [int(curr_pos[p_i][0]), int(curr_pos[p_i][1])]
                 for i in range(2):
                     dir = dst_pos[i] - src_pos[i]
                     if (dir < 0 and curr_pos[p_i][i] < dst_pos[i]) or (dir > 0 and curr_pos[p_i][i] > dst_pos[i]):
                         curr_pos[p_i][i] = dst_pos[i]
                 # Draw the moving circles
-                color_index = self.board.board[board_pos[p_i][1]][board_pos[p_i][0]]
-                #print(f"{curr_ani_time=} {partial_dist=} {curr_pos=} {color_index=}")
+                color_index = self.board.board[board_points[p_i][1]][board_points[p_i][0]]
                 if color_index < 0:
                     continue
                 color = self.colors[color_index]
@@ -113,18 +117,19 @@ class Match3GUI:
     def animate_clear(self, board_points: list[tuple[int, int]]) -> None:
         win_points = [self.board_pos_to_win_pos(*p) for p in board_points]
 
-        curr_ani_time = 0
-        curr_time = pygame.time.get_ticks()
-        ani_time_start = curr_time
-
         target_transparency = 0
         target_size = 0
         curr_transparency = 255
         curr_size = self.circle_radius
 
+        curr_ani_time = 0
+        curr_time = pygame.time.get_ticks()
+        ani_time_start = curr_time
+
         while curr_transparency != target_transparency or curr_size != target_size:
             if self.process_events():
                 win_points = [self.board_pos_to_win_pos(*p) for p in board_points]
+
             self.clock.tick(self.target_fps)
             self.screen.fill(self.background_color)
             self.draw_board(no_draw_pts=board_points)
@@ -139,12 +144,10 @@ class Match3GUI:
             curr_size = int(self.circle_radius * (1 - curr_ani_time / self.ani_time))
             if curr_size < target_size:
                 curr_size = target_size
-            #print(f"{curr_ani_time=} {curr_transparency=} {curr_size=} while={curr_transparency != target_transparency or curr_size != target_size}")
 
             for i, p in enumerate(board_points):
                 # Draw the moving circles
                 color_index = self.board.board[p[1]][p[0]]
-                #print(f"{curr_ani_time=} {partial_dist=} {curr_pos=} {color_index=}")
                 if color_index < 0:
                     continue
                 color = self.colors[color_index]
@@ -153,15 +156,57 @@ class Match3GUI:
 
             pygame.display.flip()
 
-    def animate_shift_down(self) -> None:
-        self.update_board()
-        pygame.time.wait(self.ani_time)
+    def animate_shift_down(self, shifted_bp: list[tuple[int, int]]) -> None:
+        board_points_dst = shifted_bp
+        board_points_src = [(x, y - 1) for (x, y) in board_points_dst]
+        win_points_dst = [list(self.board_pos_to_win_pos(*p)) for p in board_points_dst]
+        win_points_src = [list(self.board_pos_to_win_pos(*p)) for p in board_points_src]
+        color_indices = [self.board.board[y][x] for (x, y) in board_points_dst]
+
+        curr_pos = [[x, y] for (x, y) in win_points_src]
+
+        curr_ani_time = 0
+        curr_time = pygame.time.get_ticks()
+        ani_time_start = curr_time
+
+        while any([curr_pos[i] != win_points_dst[i] for i in range(len(curr_pos))]):
+            if self.process_events():
+                win_points_dst = [list(self.board_pos_to_win_pos(*p)) for p in board_points_dst]
+                win_points_src = [list(self.board_pos_to_win_pos(*p)) for p in board_points_src]
+
+            self.clock.tick(self.target_fps)
+            self.screen.fill(self.background_color)
+            self.draw_board(no_draw_pts=board_points_src + board_points_dst)
+
+            curr_time = pygame.time.get_ticks()
+            curr_ani_time = curr_time - ani_time_start
+
+            for p_i in range(len(curr_pos)):
+                # Calculate the new position
+                src_pos = win_points_src[p_i]
+                dst_pos = win_points_dst[p_i]
+                target_dist = ((dst_pos[0] - src_pos[0]), (dst_pos[1] - src_pos[1]))
+                curr_dist = (target_dist[0] * curr_ani_time / self.ani_time, target_dist[1] * curr_ani_time / self.ani_time)
+                curr_pos[p_i] = [src_pos[0] + curr_dist[0], src_pos[1] + curr_dist[1]]
+                curr_pos[p_i] = [int(curr_pos[p_i][0]), int(curr_pos[p_i][1])]
+                for i in range(2):
+                    dir = dst_pos[i] - src_pos[i]
+                    if (dir < 0 and curr_pos[p_i][i] < dst_pos[i]) or (dir > 0 and curr_pos[p_i][i] > dst_pos[i]):
+                        curr_pos[p_i][i] = dst_pos[i]
+                # Draw the moving circles
+                color_index = color_indices[p_i]
+                if color_index < 0:
+                    continue
+                color = self.colors[color_index]
+                pygame.draw.circle(self.screen, self.border_color, curr_pos[p_i], int(self.circle_radius))
+                pygame.draw.circle(self.screen, color, curr_pos[p_i], int(self.circle_radius * 9 / 10))
+
+            pygame.display.flip()
 
     def draw_board(self, no_draw_pts: list[tuple[int, int]] = None) -> None:
         for row in range(self.board.rows):
             for col in range(self.board.cols):
                 if no_draw_pts is not None and (col, row) in no_draw_pts:
-                    #print(f"{no_draw_pts=}")
                     continue
                 color_index = self.board.board[row][col]
                 if color_index < 0:
@@ -197,7 +242,6 @@ class Match3GUI:
                 if event.button != 1:
                     continue
                 if self.mouse_state == MouseState.WAITING:
-                    #print(f"MOUSEBUTTONDOWN from WAITING @ {event.pos=}")
                     self.board_pos_src = self.win_pos_to_board_pos(*event.pos)
                     # Check that the mouse is inside a circle
                     circle_center = self.board_pos_to_win_pos(*self.board_pos_src)
@@ -206,10 +250,8 @@ class Match3GUI:
                         self.mouse_state = MouseState.PRESSED
             elif mouse and event.type == pygame.MOUSEMOTION:
                 if self.mouse_state == MouseState.PRESSED:
-                    #print(f"MOUSEMOTION from PRESSED @ {event.pos=}")
                     self.mouse_state = MouseState.MOVING
                 if self.mouse_state == MouseState.MOVING:
-                    #print(f"MOUSEMOTION from MOVING @ {event.pos=}")
                     board_pos_dst = self.win_pos_to_board_pos(*event.pos)
                     # Check that the mouse was dragged to a different position in the board
                     if self.board_pos_src == board_pos_dst:
@@ -243,16 +285,14 @@ class Match3GUI:
                             print(f"Swap not valid: No match3 groups found.")
                             self.animate_swap(board_pos_dst, self.board_pos_src)
                             self.board.swap(board_pos_dst, self.board_pos_src)
-                            self.update_board()
+                            #self.update_board()
                         self.mouse_state = MouseState.WAITING
             elif mouse and event.type == pygame.MOUSEBUTTONUP:
                 if event.button != 1:
                     continue
                 if self.mouse_state == MouseState.PRESSED:
-                    #print(f"MOUSEBUTTONUP from PRESSED @ {event.pos=}")
                     self.mouse_state = MouseState.WAITING
                 elif self.mouse_state == MouseState.MOVING:
-                    #print(f"MOUSEBUTTONUP from MOVING @ {event.pos=}")
                     self.mouse_state = MouseState.WAITING
         return ret
 
@@ -275,7 +315,6 @@ class Match3GUI:
             while groups:
                 points = [point for group in groups for point in group]
                 # Clear the tiles that create a match3 group
-                #print(f"{groups=} {points=}")
                 self.animate_clear(points)
                 self.board.clear(points)
                 self.update_board()
@@ -283,112 +322,43 @@ class Match3GUI:
                 # Do this until the board is filled
                 board_is_not_full = True
                 while board_is_not_full:
-                    self.board.shift_down()
+                    shifted = self.board.shift_down()
                     try:
-                        self.board.populate(rows=[0, 1], no_valid_play_check=False)
+                        shifted = shifted + self.board.populate(rows=[0, 1], no_valid_play_check=False)
                     except RecursionError:
                         print(f"Could't populate. Regenerating the board.")
-                        #print(self.board)
                         self.board.clear()
                         try:
                             self.board.populate()
                         except RecursionError:
                             print(f"ERROR: Couldn't regenerate the the board.")
                             pygame.quit()
-                            exit()
+                            exit(1)
                         self.update_board()
                         break
+                    self.animate_shift_down(shifted)
                     board_is_not_full = not self.board.is_full()
-                    #print(f"{board_is_not_full=}")
-                    # Run the animation to shift down the tiles
-                    self.animate_shift_down()
+
                 groups = self.board.get_valid_groups()
-                #print(f"{groups=}")
 
             # Check if there is a valid play, if not, regenerate the board
             result = self.board.find_a_play()
             if len(result) == 0:
                 print(f"No more moves. Regenerating the board.")
-                #print(self.board)
                 self.board.clear()
                 try:
                     self.board.populate()
                 except RecursionError:
                     print(f"ERROR: Couldn't regenerate the the board.")
                     pygame.quit()
-                    exit()
+                    exit(1)
                 self.update_board()
             else:
                 # Let the computer play (for debug)
                 (swap_points, groups) = result
-                '''print(f"Swapping {swap_points[0]} with {swap_points[1]}.")
-                self.animate_swap(swap_points[0], swap_points[1])
-                self.board.swap(swap_points[0], swap_points[1])
-                self.update_board()'''
-                '''if any([len(g) > 3 for g in groups]):
-                    print(f"{groups=}")
-                    print(self.board)
-                    pygame.time.wait(5000)'''
+                # print(f"Swapping {swap_points[0]} with {swap_points[1]}.")
+                # self.animate_swap(swap_points[0], swap_points[1])
+                # self.board.swap(swap_points[0], swap_points[1])
+                # self.update_board()
 
             self.clock.tick(self.target_fps)
-
-        pygame.quit()
-
-
-        '''circle_radius = width // self.board.cols // 2
-        curr_pos = [width // 2, height // 2]
-        src_pos = [0, 0]
-        dest_pos = [width, height]
-        total_dist = [dest_pos[0] - src_pos[0], dest_pos[1] - src_pos[1]]
-        ani_time = 1000
-        curr_ani_time = 0
-        curr_time = pygame.time.get_ticks()
-        ani_time_start = curr_time
-
-        running = True
-        while running:
-            clock.tick(60)
-
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.VIDEORESIZE:
-                    print(event.size)
-                    width = min(event.size)
-                    if width < 500:
-                        width = 500
-                    height = width
-                    scale = width / size[0]
-                    size = (width, height)
-                    screen = pygame.display.set_mode(size, flags, vsync=1)
-                    curr_pos = [int(curr_pos[0] * scale), int(curr_pos[1] * scale)]
-                    src_pos = [int(src_pos[0] * scale), int(src_pos[1] * scale)]
-                    dest_pos = [int(dest_pos[0] * scale), int(dest_pos[1] * scale)]
-                    total_dist = [dest_pos[0] - src_pos[0], dest_pos[1] - src_pos[1]]
-                    circle_radius = int(circle_radius * scale)
-
-            screen.fill((0, 0, 0))
-
-            curr_time = pygame.time.get_ticks()
-            curr_ani_time = curr_time - ani_time_start
-
-            partial_dist = (total_dist[0] * curr_ani_time / ani_time, total_dist[1] * curr_ani_time / ani_time)
-            curr_pos = [src_pos[0] + partial_dist[0], src_pos[1] + partial_dist[1]]
-            curr_pos = [int(curr_pos[0]), int(curr_pos[1])]
-            for i in range(2):
-                dir = dest_pos[i] - src_pos[i]
-                if (dir < 0 and curr_pos[i] < dest_pos[i]) or (dir > 0 and curr_pos[i] > dest_pos[i]):
-                    curr_pos[i] = dest_pos[i]
-
-            if curr_pos == dest_pos:
-                curr_ani_time = 0
-                ani_time_start = curr_time
-                tmp_pos = src_pos
-                src_pos = dest_pos
-                dest_pos = tmp_pos
-                total_dist = [dest_pos[0] - src_pos[0], dest_pos[1] - src_pos[1]]
-                print(clock.get_fps())
-
-            pygame.draw.circle(screen, (255, 255, 255), curr_pos, circle_radius)
-
-            pygame.display.flip()'''
