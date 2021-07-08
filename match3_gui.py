@@ -148,8 +148,8 @@ class Match3GUI:
             if curr_size < target_size:
                 curr_size = target_size
 
+            # Draw the moving circles
             for i, p in enumerate(board_points):
-                # Draw the moving circles
                 color_index = self.board.board[p[1]][p[0]]
                 if color_index < 0:
                     continue
@@ -275,20 +275,17 @@ class Match3GUI:
                     pic = self.point_inside_circle(event.pos, circle_center, int(self.circle_radius * self.circle_line_width))
                     # Check that the mouse is inside the neighbor's circle
                     if pic:
-                        # Check that the swap is valid and run the animation
+                        # Do the swap, if it was not a valid play, revert it
                         swap_valid = self.board.is_swap_valid(self.board_pos_src, board_pos_dst)
                         self.animate_swap(self.board_pos_src, board_pos_dst)
                         self.board.swap(self.board_pos_src, board_pos_dst)
                         self.update_board()
                         if swap_valid:
-                            # Swap is valid, do the swap in the board state
                             print(f"Swapping {self.board_pos_src} with {board_pos_dst}.")
                         else:
-                            # Swap is not valid, revert the swap
                             print(f"Swap not valid: No match3 groups found.")
                             self.animate_swap(board_pos_dst, self.board_pos_src)
                             self.board.swap(board_pos_dst, self.board_pos_src)
-                            #self.update_board()
                         self.mouse_state = MouseState.WAITING
             elif mouse and event.type == pygame.MOUSEBUTTONUP:
                 if event.button != 1:
