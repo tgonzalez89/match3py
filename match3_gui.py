@@ -26,10 +26,11 @@ class Match3GUI:
     ]
     border_color = (0, 0, 0)
     background_color = (255, 255, 255)
-    min_width = 500
-    min_height = 500
+    min_width = 640
+    min_height = 640
     ani_time = 150
     target_fps = 60
+    circle_line_width = 19 / 20
     flags = pygame.RESIZABLE
 
     def __init__(self, side_len: int = 13) -> None:
@@ -44,6 +45,8 @@ class Match3GUI:
         self.clock = None
         self.mouse_state = MouseState.WAITING
         self.board_pos_src = None
+        self.score = 0
+        self.time_left = 60000
 
     def win_pos_to_board_pos(self, win_pos_x: int, win_pos_y: int) -> tuple[int, int]:
         col_w = self.width / self.board.cols
@@ -110,7 +113,7 @@ class Match3GUI:
                     continue
                 color = self.colors[color_index]
                 pygame.draw.circle(self.screen, self.border_color, curr_pos[p_i], int(self.circle_radius))
-                pygame.draw.circle(self.screen, color, curr_pos[p_i], int(self.circle_radius * 9 / 10))
+                pygame.draw.circle(self.screen, color, curr_pos[p_i], int(self.circle_radius * self.circle_line_width))
 
             pygame.display.flip()
 
@@ -152,7 +155,7 @@ class Match3GUI:
                     continue
                 color = self.colors[color_index]
                 pygame.draw.circle(self.screen, list(self.border_color) + [curr_transparency], win_points[i], int(curr_size))
-                pygame.draw.circle(self.screen, list(color) + [curr_transparency], win_points[i], int(curr_size * 9 / 10))
+                pygame.draw.circle(self.screen, list(color) + [curr_transparency], win_points[i], int(curr_size * self.circle_line_width))
 
             pygame.display.flip()
 
@@ -199,7 +202,7 @@ class Match3GUI:
                     continue
                 color = self.colors[color_index]
                 pygame.draw.circle(self.screen, self.border_color, curr_pos[p_i], int(self.circle_radius))
-                pygame.draw.circle(self.screen, color, curr_pos[p_i], int(self.circle_radius * 9 / 10))
+                pygame.draw.circle(self.screen, color, curr_pos[p_i], int(self.circle_radius * self.circle_line_width))
 
             pygame.display.flip()
 
@@ -214,7 +217,7 @@ class Match3GUI:
                 color = self.colors[color_index]
                 pos = self.board_pos_to_win_pos(col, row)
                 pygame.draw.circle(self.screen, self.border_color, pos, int(self.circle_radius))
-                pygame.draw.circle(self.screen, color, pos, int(self.circle_radius * 9 / 10))
+                pygame.draw.circle(self.screen, color, pos, int(self.circle_radius * self.circle_line_width))
 
     def update_board(self) -> None:
         self.clock.tick(self.target_fps)
@@ -245,7 +248,7 @@ class Match3GUI:
                     self.board_pos_src = self.win_pos_to_board_pos(*event.pos)
                     # Check that the mouse is inside a circle
                     circle_center = self.board_pos_to_win_pos(*self.board_pos_src)
-                    pic = self.point_inside_circle(event.pos, circle_center, int(self.circle_radius * 9 / 10))
+                    pic = self.point_inside_circle(event.pos, circle_center, int(self.circle_radius * self.circle_line_width))
                     if pic:
                         self.mouse_state = MouseState.PRESSED
             elif mouse and event.type == pygame.MOUSEMOTION:
@@ -269,7 +272,7 @@ class Match3GUI:
                         self.mouse_state = MouseState.WAITING
                         continue
                     circle_center = self.board_pos_to_win_pos(*board_pos_dst)
-                    pic = self.point_inside_circle(event.pos, circle_center, int(self.circle_radius * 9 / 10))
+                    pic = self.point_inside_circle(event.pos, circle_center, int(self.circle_radius * self.circle_line_width))
                     # Check that the mouse is inside the neighbor's circle
                     if pic:
                         # Check that the swap is valid and run the animation
@@ -296,6 +299,14 @@ class Match3GUI:
                     self.mouse_state = MouseState.WAITING
         return ret
 
+    def calc_score(self, groups: list[list[tuple[int, int]]]) -> int:
+        score = 0
+        for group in groups:
+            score += len(group)
+            score += len(group) - 3
+        score += len(groups) - 1
+        return score
+
     def run(self) -> None:
         pygame.init()
         self.screen = pygame.display.set_mode(self.size, self.flags, vsync=1)
@@ -313,6 +324,11 @@ class Match3GUI:
             # Do this until the board state is stabilized
             groups = self.board.get_valid_groups()
             while groups:
+                curr_score = self.calc_score(groups)
+                self.score += curr_score
+                self.time_left += curr_score * 100
+                print(f"SCORE: {self.score}")
+                print(f"TIME LEFT: {self.time_left}")
                 points = [point for group in groups for point in group]
                 # Clear the tiles that create a match3 group
                 self.animate_clear(points)
@@ -338,7 +354,6 @@ class Match3GUI:
                         break
                     self.animate_shift_down(shifted)
                     board_is_not_full = not self.board.is_full()
-
                 groups = self.board.get_valid_groups()
 
             # Check if there is a valid play, if not, regenerate the board
@@ -356,7 +371,7 @@ class Match3GUI:
             else:
                 # Let the computer play (for debug)
                 (swap_points, groups) = result
-                # print(f"Swapping {swap_points[0]} with {swap_points[1]}.")
+                # print(f"Bot swapping {swap_points[0]} with {swap_points[1]}.")
                 # self.animate_swap(swap_points[0], swap_points[1])
                 # self.board.swap(swap_points[0], swap_points[1])
                 # self.update_board()

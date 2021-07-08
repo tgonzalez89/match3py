@@ -1,0 +1,58 @@
+Scoring system
+    Number of tiles in group = number of points? Look for other examples of scoring systems.
+        Bonus for groups of more than 3 or multiple groups?
+    Initial time of 1 minute.
+    Add time for each time a valid match is done.
+        Bonus for groups of more than 3 or multiple groups?
+        Think about a hard cap (5 min?) or some kind of soft cap.
+            Soft cap -> added time needs to have dimishing returns or some mechanism to make it impossible to go infinite.
+                Mechanism can be to cap added time to the min time the animation takes. Think about multiple matches in one swap (cascades).
+
+Better Bot
+    Make a function that maximizes the score.
+        Find the swap that gives the best score in a given board.
+            Take into account tiles that fall.
+
+High scores
+    Save in plain text or encrypt?
+    If encrypt, how and where to store the key.
+
+Nicer GUI and effects
+    Message for when board needs to be regenerated because no more valid moves or fail to populate.
+    Show score somewhere.
+    Maybe show high scores to beat.
+    Show timer.
+    Show some nice effect when adding to score or to timer. A flashy number next to it or make it bigger and change color for a moment.
+    Add transparency to fading when a match is done.
+    This will need to put extra stuff that is not the board, so the window can't be square anymore. Need to adapt win coords of board in all draw/animation functions.
+    Buttom for Menu (pause)
+    Anti-aliasing: https://stackoverflow.com/questions/23852917/antialiasing-shapes-in-pygame
+
+Menus
+    Welcome menu with:
+        New Game
+            Choose size
+            Choose difficulty? easy, normal, hard -> change number of colors at certain size
+        High scores
+            View per size
+        Settings/Preferences
+            Save to file.
+        About
+    Press ESC to pause
+        Show menu. Make sure it blocks the whole screen to block the user to using it as a way to gain more time to watch the board.
+        
+Audio
+    Backgroun music
+    Sound effects
+        match
+        dissapear
+        swap
+        shift down?
+        timer about to run?
+    Settings/Preferences -> turn on/off music and effects
+
+Resizing
+    Doesn't work very well in Linux
+    Test not forcing the window size to a specific shape.
+        Window shape (ratio) shouldn't matter, adapt GUI to it.
+            Either stretch or expand stuff or have a fixed ratio and put black bars at top/bottom or left/right depending on size.
