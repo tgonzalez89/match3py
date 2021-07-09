@@ -46,7 +46,10 @@ class Match3GUI:
         self.mouse_state = MouseState.WAITING
         self.board_pos_src = None
         self.score = 0
-        self.time_left = 60000
+        self.time_init = 60000
+        self.time_left = self.time_init
+        self.time_start = 0
+        self.time_score = 0
 
     def win_pos_to_board_pos(self, win_pos_x: int, win_pos_y: int) -> tuple[int, int]:
         col_w = self.width / self.board.cols
@@ -78,8 +81,7 @@ class Match3GUI:
         curr_pos = [list(win_points[0]), list(win_points[1])]
 
         curr_ani_time = 0
-        curr_time = pygame.time.get_ticks()
-        ani_time_start = curr_time
+        ani_time_start = pygame.time.get_ticks()
 
         while curr_pos[0] != win_points[1] or curr_pos[1] != win_points[0]:  # curr_p1 != dst_p1 or curr_p2 != dst_p2
             if self.process_events():
@@ -89,12 +91,10 @@ class Match3GUI:
                     [win_points[0][0] - win_points[1][0], win_points[0][1] - win_points[1][1]],  # [dst_p2_x - src_p2_x, dst_p2_y - src_p2_y]
                 )
 
-            self.clock.tick(self.target_fps)
             self.screen.fill(self.background_color)
             self.draw_board(no_draw_pts=board_points)
 
-            curr_time = pygame.time.get_ticks()
-            curr_ani_time = curr_time - ani_time_start
+            curr_ani_time = pygame.time.get_ticks() - ani_time_start
 
             for p_i in reversed(range(2)):
                 # Calculate the new position
@@ -126,19 +126,16 @@ class Match3GUI:
         curr_size = self.circle_radius
 
         curr_ani_time = 0
-        curr_time = pygame.time.get_ticks()
-        ani_time_start = curr_time
+        ani_time_start = pygame.time.get_ticks()
 
         while curr_transparency != target_transparency or curr_size != target_size:
             if self.process_events():
                 win_points = [self.board_pos_to_win_pos(*p) for p in board_points]
 
-            self.clock.tick(self.target_fps)
             self.screen.fill(self.background_color)
             self.draw_board(no_draw_pts=board_points)
 
-            curr_time = pygame.time.get_ticks()
-            curr_ani_time = curr_time - ani_time_start
+            curr_ani_time = pygame.time.get_ticks() - ani_time_start
 
             # Calculate the new size and the new transparency
             curr_transparency = int(target_transparency * (1 - curr_ani_time / self.ani_time))
@@ -169,20 +166,17 @@ class Match3GUI:
         curr_pos = [[x, y] for (x, y) in win_points_src]
 
         curr_ani_time = 0
-        curr_time = pygame.time.get_ticks()
-        ani_time_start = curr_time
+        ani_time_start = pygame.time.get_ticks()
 
         while any([curr_pos[i] != win_points_dst[i] for i in range(len(curr_pos))]):
             if self.process_events():
                 win_points_dst = [list(self.board_pos_to_win_pos(*p)) for p in board_points_dst]
                 win_points_src = [list(self.board_pos_to_win_pos(*p)) for p in board_points_src]
 
-            self.clock.tick(self.target_fps)
             self.screen.fill(self.background_color)
             self.draw_board(no_draw_pts=board_points_src + board_points_dst)
 
-            curr_time = pygame.time.get_ticks()
-            curr_ani_time = curr_time - ani_time_start
+            curr_ani_time = pygame.time.get_ticks() - ani_time_start
 
             for p_i in range(len(curr_pos)):
                 # Calculate the new position
@@ -220,12 +214,22 @@ class Match3GUI:
                 pygame.draw.circle(self.screen, color, pos, int(self.circle_radius * self.circle_line_width))
 
     def update_board(self) -> None:
-        self.clock.tick(self.target_fps)
         self.screen.fill(self.background_color)
         self.draw_board()
         pygame.display.flip()
 
     def process_events(self, mouse: bool = False) -> bool:
+        # Wait until frame time
+        self.clock.tick(self.target_fps)
+
+        # Update the time left
+        self.time_left = self.time_init + self.time_score - (pygame.time.get_ticks() - self.time_start)
+        if self.time_left <= 0:
+            print(f"Time's up. Final score: {self.score}")
+            pygame.quit()
+            exit()
+
+        # Process events
         ret = False
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -279,7 +283,6 @@ class Match3GUI:
                         swap_valid = self.board.is_swap_valid(self.board_pos_src, board_pos_dst)
                         self.animate_swap(self.board_pos_src, board_pos_dst)
                         self.board.swap(self.board_pos_src, board_pos_dst)
-                        self.update_board()
                         if swap_valid:
                             print(f"Swapping {self.board_pos_src} with {board_pos_dst}.")
                         else:
@@ -296,67 +299,47 @@ class Match3GUI:
                     self.mouse_state = MouseState.WAITING
         return ret
 
-    def calc_score(self, groups: list[list[tuple[int, int]]]) -> int:
-        score = 0
-        for group in groups:
-            score += len(group)
-            score += len(group) - 3
-        score += len(groups) - 1
-        return score
-
     def run(self) -> None:
         pygame.init()
         self.screen = pygame.display.set_mode(self.size, self.flags, vsync=1)
         self.clock = pygame.time.Clock()
 
         self.update_board()
+        self.time_start = pygame.time.get_ticks()
 
         while True:
             if self.process_events(mouse=True):
                 self.update_board()
 
             # Find all the match3 groups and update the board state by
-            # clearing them and then filling the board with new tiles
+            # clearing them and then filling the board with new tiles from the top
             # while shifting down the ones floating
             # Do this until the board state is stabilized
             groups = self.board.get_valid_groups()
-            while groups:
-                curr_score = self.calc_score(groups)
+            while len(groups) > 0:
+                # Calculate the score from the match3 groups, add extra time poportional to the score
+                curr_score = self.board.calc_score(groups)
                 self.score += curr_score
-                self.time_left += curr_score * 100
+                self.time_score += curr_score * 100
                 print(f"SCORE: {self.score}")
                 print(f"TIME LEFT: {self.time_left}")
-                points = [point for group in groups for point in group]
                 # Clear the tiles that create a match3 group
+                points = [point for group in groups for point in group]
                 self.animate_clear(points)
                 self.board.clear(points)
-                self.update_board()
                 # Shift down the tiles that are floating and create new tiles in the top row
                 # Do this until the board is filled
-                board_is_not_full = True
-                while board_is_not_full:
+                while not self.board.is_full():
                     shifted = self.board.shift_down()
-                    try:
-                        shifted = shifted + self.board.populate(rows=[0, 1], no_valid_play_check=False)
-                    except RecursionError:
-                        print(f"Could't populate. Regenerating the board.")
-                        self.board.clear()
-                        try:
-                            self.board.populate()
-                        except RecursionError:
-                            print(f"ERROR: Couldn't regenerate the the board.")
-                            pygame.quit()
-                            exit(1)
-                        self.update_board()
-                        break
+                    shifted += self.board.populate(rows=[0, 1], no_valid_play_check=False, no_match3_group_check=False)
                     self.animate_shift_down(shifted)
-                    board_is_not_full = not self.board.is_full()
                 groups = self.board.get_valid_groups()
 
             # Check if there is a valid play, if not, regenerate the board
-            result = self.board.find_a_play()
-            if len(result) == 0:
+            play = self.board.find_a_play()
+            if len(play) == 0:
                 print(f"No more moves. Regenerating the board.")
+                self.animate_clear([(x, y) for y in range(self.board.rows) for x in range(self.board.cols)])
                 self.board.clear()
                 try:
                     self.board.populate()
@@ -365,12 +348,11 @@ class Match3GUI:
                     pygame.quit()
                     exit(1)
                 self.update_board()
-            else:
-                # Let the computer play (for debug)
-                (swap_points, groups) = result
-                # print(f"Bot swapping {swap_points[0]} with {swap_points[1]}.")
-                # self.animate_swap(swap_points[0], swap_points[1])
-                # self.board.swap(swap_points[0], swap_points[1])
-                # self.update_board()
 
-            self.clock.tick(self.target_fps)
+            # Let the computer play (for debug)
+            # play = self.board.find_better_play()
+            # if len(play) > 0:
+            #     (swap_points, groups) = play
+            #     print(f"Bot swapping {swap_points[0]} with {swap_points[1]}.")
+            #     self.animate_swap(swap_points[0], swap_points[1])
+            #     self.board.swap(swap_points[0], swap_points[1])

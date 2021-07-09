@@ -1,16 +1,16 @@
-Scoring system
-    Number of tiles in group = number of points? Look for other examples of scoring systems.
-        Bonus for groups of more than 3 or multiple groups?
-    Initial time of 1 minute.
-    Add time for each time a valid match is done.
-        Bonus for groups of more than 3 or multiple groups?
-        Think about a hard cap (5 min?) or some kind of soft cap.
-            Soft cap -> added time needs to have dimishing returns or some mechanism to make it impossible to go infinite.
-                Mechanism can be to cap added time to the min time the animation takes. Think about multiple matches in one swap (cascades).
+#Scoring system
+    #Number of tiles in group = number of points? Look for other examples of scoring systems.
+        #Bonus for groups of more than 3 or multiple groups?
+    #Initial time of 1 minute.
+    #Add time for each time a valid match is done.
+        #Bonus for groups of more than 3 or multiple groups?
+        #Think about a hard cap (5 min?) or some kind of soft cap.
+            #Soft cap -> added time needs to have dimishing returns or some mechanism to make it impossible to go infinite.
+                #Mechanism can be to cap added time to the min time the animation takes. Think about multiple matches in one swap (cascades).
 
 Better Bot
-    Make a function that maximizes the score.
-        Find the swap that gives the best score in a given board.
+    #Make a function that maximizes the score.
+        #Find the swap that gives the best score in a given board.
             Take into account tiles that fall.
 
 High scores

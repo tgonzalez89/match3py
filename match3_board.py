@@ -43,7 +43,7 @@ class Match3Board:
             for (x, y) in points:
                 self.board[y][x] = self.empty
 
-    def populate(self, cols: tuple[int, int] = None, rows: tuple[int, int] = None, no_valid_play_check: bool = True) -> list[tuple[int, int]]:
+    def populate(self, cols: tuple[int, int] = None, rows: tuple[int, int] = None, no_valid_play_check: bool = True, no_match3_group_check: bool = True) -> list[tuple[int, int]]:
         populated = list()
         if cols is None:
             cols = (0, self.cols)
@@ -63,14 +63,14 @@ class Match3Board:
                         if not self.filter_group(self.get_group(col, row)):
                             break
                     # If after checking all possible values no value was found that didn't result in a match3 group, re-run.
-                    if len(values_left) == 0:
+                    if no_match3_group_check and len(values_left) == 0:
                         self.board = backup_board
-                        return self.populate(cols, rows, no_valid_play_check)
+                        return self.populate(cols, rows, no_valid_play_check, no_match3_group_check)
                     populated.append((col, row))
         # Check that the board has at least one possible play, if not, re-run.
         if no_valid_play_check and len(self.find_a_play()) == 0:
             self.board = backup_board
-            return self.populate(cols, rows, no_valid_play_check)
+            return self.populate(cols, rows, no_valid_play_check, no_match3_group_check)
         return populated
 
     def out_of_bounds(self, col: int, row: int) -> bool:
@@ -182,3 +182,35 @@ class Match3Board:
                 groups.append(group)
         self.swap(point1, point2)
         return len(groups) > 0
+
+    def calc_score(self, groups: list[list[tuple[int, int]]]) -> int:
+        score = 0
+        for group in groups:
+            score += len(group)
+            score += len(group) - 3
+        score += len(groups) - 1
+        return score
+
+    def find_better_play(self) -> tuple[tuple[tuple[int, int], tuple[int, int]], list[list[tuple[int, int]]]]:
+        best_play = tuple()
+        best_score = 0
+        for row in range(self.rows):
+            for col in range(self.cols):
+                for (x, y) in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                    neigh_x = col + x
+                    neigh_y = row + y
+                    if self.out_of_bounds(neigh_x, neigh_y) or self.board[row][col] == self.board[neigh_y][neigh_x]:
+                        continue
+                    swap_points = ((col, row), (neigh_x, neigh_y))
+                    self.swap(*swap_points)
+                    groups = list()
+                    for (x, y) in swap_points:
+                        group = self.filter_group(self.get_group(x, y))
+                        if len(group) > 0:
+                            groups.append(group)
+                    self.swap(*swap_points)
+                    score = self.calc_score(groups)
+                    if score > best_score:
+                        best_score = score
+                        best_play = (swap_points, groups)
+        return best_play
