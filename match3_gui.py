@@ -28,8 +28,11 @@ class Match3GUI:
     background_color = (255, 255, 255)
     min_width = 640
     min_height = 640
-    ani_time = 150
-    target_fps = 60
+    swap_ani_time = 150
+    shift_down_ani_time = 200
+    clear_ani_time = 200
+    ani_fps = 360
+    main_loop_refresh_rate = 30
     circle_line_width = 19 / 20
     flags = pygame.RESIZABLE
 
@@ -100,7 +103,7 @@ class Match3GUI:
                 # Calculate the new position
                 src_pos = win_points[p_i]
                 dst_pos = win_points[int(not p_i)]
-                curr_dist = (target_dist[p_i][0] * curr_ani_time / self.ani_time, target_dist[p_i][1] * curr_ani_time / self.ani_time)
+                curr_dist = (target_dist[p_i][0] * curr_ani_time / self.swap_ani_time, target_dist[p_i][1] * curr_ani_time / self.swap_ani_time)
                 curr_pos[p_i] = [src_pos[0] + curr_dist[0], src_pos[1] + curr_dist[1]]
                 curr_pos[p_i] = [int(curr_pos[p_i][0]), int(curr_pos[p_i][1])]
                 for i in range(2):
@@ -138,10 +141,10 @@ class Match3GUI:
             curr_ani_time = pygame.time.get_ticks() - ani_time_start
 
             # Calculate the new size and the new transparency
-            curr_transparency = int(target_transparency * (1 - curr_ani_time / self.ani_time))
+            curr_transparency = int(target_transparency * (1 - curr_ani_time / self.clear_ani_time))
             if curr_transparency > target_transparency:
                 curr_transparency = target_transparency
-            curr_size = int(self.circle_radius * (1 - curr_ani_time / self.ani_time))
+            curr_size = int(self.circle_radius * (1 - curr_ani_time / self.clear_ani_time))
             if curr_size < target_size:
                 curr_size = target_size
 
@@ -156,7 +159,7 @@ class Match3GUI:
 
             pygame.display.flip()
 
-    def animate_shift_down(self, shifted_bp: list[tuple[int, int]]) -> None:
+    def animate_shift_down(self, shifted_bp: list[tuple[int, int]], num_vertical_points: int) -> None:
         board_points_dst = shifted_bp
         board_points_src = [(x, y - 1) for (x, y) in board_points_dst]
         win_points_dst = [list(self.board_pos_to_win_pos(*p)) for p in board_points_dst]
@@ -165,6 +168,9 @@ class Match3GUI:
 
         curr_pos = [[x, y] for (x, y) in win_points_src]
 
+        ani_time = self.shift_down_ani_time / num_vertical_points
+        if ani_time < 100:
+            ani_time = 100
         curr_ani_time = 0
         ani_time_start = pygame.time.get_ticks()
 
@@ -183,7 +189,7 @@ class Match3GUI:
                 src_pos = win_points_src[p_i]
                 dst_pos = win_points_dst[p_i]
                 target_dist = ((dst_pos[0] - src_pos[0]), (dst_pos[1] - src_pos[1]))
-                curr_dist = (target_dist[0] * curr_ani_time / self.ani_time, target_dist[1] * curr_ani_time / self.ani_time)
+                curr_dist = (target_dist[0] * curr_ani_time / ani_time, target_dist[1] * curr_ani_time / ani_time)
                 curr_pos[p_i] = [src_pos[0] + curr_dist[0], src_pos[1] + curr_dist[1]]
                 curr_pos[p_i] = [int(curr_pos[p_i][0]), int(curr_pos[p_i][1])]
                 for i in range(2):
@@ -218,9 +224,11 @@ class Match3GUI:
         self.draw_board()
         pygame.display.flip()
 
-    def process_events(self, mouse: bool = False) -> bool:
+    def process_events(self, fps: int = -1, mouse: bool = False) -> bool:
         # Wait until frame time
-        self.clock.tick(self.target_fps)
+        if fps < 0:
+            fps = self.ani_fps
+        self.clock.tick(fps)
 
         # Update the time left
         self.time_left = self.time_init + self.time_score - (pygame.time.get_ticks() - self.time_start)
@@ -299,6 +307,12 @@ class Match3GUI:
                     self.mouse_state = MouseState.WAITING
         return ret
 
+    def get_num_vertical_points(self, points: list[tuple[int, int]]) -> int:
+        points_in_line = dict()
+        for (col, _) in points:
+            points_in_line[col] = points_in_line.get(col, 0) + 1
+        return max(points_in_line.values())
+
     def run(self) -> None:
         pygame.init()
         self.screen = pygame.display.set_mode(self.size, self.flags, vsync=1)
@@ -308,7 +322,7 @@ class Match3GUI:
         self.time_start = pygame.time.get_ticks()
 
         while True:
-            if self.process_events(mouse=True):
+            if self.process_events(fps=self.main_loop_refresh_rate, mouse=True):
                 self.update_board()
 
             # Find all the match3 groups and update the board state by
@@ -329,10 +343,11 @@ class Match3GUI:
                 self.board.clear(points)
                 # Shift down the tiles that are floating and create new tiles in the top row
                 # Do this until the board is filled
+                num_vertical_points = self.get_num_vertical_points(points)
                 while not self.board.is_full():
                     shifted = self.board.shift_down()
                     shifted += self.board.populate(rows=[0, 1], no_valid_play_check=False, no_match3_group_check=False)
-                    self.animate_shift_down(shifted)
+                    self.animate_shift_down(shifted, num_vertical_points)
                 groups = self.board.get_valid_groups()
 
             # Check if there is a valid play, if not, regenerate the board
