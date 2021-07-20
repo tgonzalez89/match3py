@@ -65,27 +65,30 @@ class Match3GUI:
         self.time_score = 0
         self.curr_time_score = 0
         self.prev_time_left_sec = self.time_left // 1000
+        self.game_surf_pos = [0, 0]
 
-    def win_pos_to_board_pos(self, win_pos_x: int, win_pos_y: int) -> tuple[int, int]:
-        shift = self.board_surf.get_width() * (1 - self.board_scale) / 2
-        win_pos_x -= shift
-        win_pos_y -= shift
+    def win_pos_to_board_pos(self, win_pos_x: int, win_pos_y: int, relative_to_window: bool = False) -> tuple[int, int]:
+        if relative_to_window:
+            shift_board2game = self.board_surf.get_width() * (1 - self.board_scale) / 2
+            win_pos_x -= shift_board2game + self.game_surf_pos[0]
+            win_pos_y -= shift_board2game + self.game_surf_pos[1]
         col_w = self.board_surf.get_width() / self.board.cols
         row_h = self.board_surf.get_height() / self.board.rows
         board_pos_x = (win_pos_x - col_w / 2) / col_w
         board_pos_y = (win_pos_y - row_h / 2) / row_h
         return (int(round(board_pos_x)), int(round(board_pos_y)))
 
-    def board_pos_to_win_pos(self, board_pos_x: int, board_pos_y: int, shift: bool = False) -> tuple[int, int]:
+    def board_pos_to_win_pos(self, board_pos_x: int, board_pos_y: int, relative_to_window: bool = False) -> tuple[int, int]:
         col_w = self.board_surf.get_width() / self.board.cols
         row_h = self.board_surf.get_height() / self.board.rows
         win_pos_x = board_pos_x * col_w + col_w / 2
         win_pos_y = board_pos_y * row_h + row_h / 2
-        if shift:
-            shift = self.board_surf.get_width() * (1 - self.board_scale) / 2
-        else:
-            shift = 0
-        return (int(win_pos_x + shift), int(win_pos_y + shift))
+        shift_board2game = 0
+        if relative_to_window:
+            shift_board2game = self.board_surf.get_width() * (1 - self.board_scale) / 2
+            win_pos_x += shift_board2game + self.game_surf_pos[0]
+            win_pos_y += shift_board2game + self.game_surf_pos[1]
+        return (int(win_pos_x), int(win_pos_y))
 
     def point_inside_circle(self, point: tuple[int, int], circle_center: tuple[int, int], r) -> bool:
         x, y = point
@@ -147,7 +150,7 @@ class Match3GUI:
                 self.draw_circle(curr_pos[p_i][0], curr_pos[p_i][1], self.colors[color_index])
 
             self.game_surf.blit(self.board_surf, (self.board_surf.get_width() * (1 - self.board_scale) / 2, self.board_surf.get_height() * (1 - self.board_scale) / 2))
-            self.screen_surf.blit(self.game_surf, (0, 0))
+            self.screen_surf.blit(self.game_surf, self.game_surf_pos)
             pygame.display.flip()
 
     def animate_clear(self, board_points: list[tuple[int, int]]) -> None:
@@ -185,7 +188,7 @@ class Match3GUI:
                 self.draw_circle(win_points[i][0], win_points[i][1], self.colors[color_index], curr_size)
 
             self.game_surf.blit(self.board_surf, (self.board_surf.get_width() * (1 - self.board_scale) / 2, self.board_surf.get_height() * (1 - self.board_scale) / 2))
-            self.screen_surf.blit(self.game_surf, (0, 0))
+            self.screen_surf.blit(self.game_surf, self.game_surf_pos)
             pygame.display.flip()
 
     def animate_shift_down(self, shifted_bp: list[tuple[int, int]], num_vertical_points: int) -> None:
@@ -231,7 +234,7 @@ class Match3GUI:
                 self.draw_circle(curr_pos[p_i][0], curr_pos[p_i][1], self.colors[color_index])
 
             self.game_surf.blit(self.board_surf, (self.board_surf.get_width() * (1 - self.board_scale) / 2, self.board_surf.get_height() * (1 - self.board_scale) / 2))
-            self.screen_surf.blit(self.game_surf, (0, 0))
+            self.screen_surf.blit(self.game_surf, self.game_surf_pos)
             pygame.display.flip()
 
     def draw_board(self, no_draw_pts: list[tuple[int, int]] = None) -> None:
@@ -267,7 +270,7 @@ class Match3GUI:
         for text in ("SCORE", str(self.score), "TIME LEFT", str(self.prev_time_left_sec)):
             if text == "TIME LEFT":
                 y += char_height + char_sep_height
-            label = font.render(text, True, (224,224,224))
+            label = font.render(text, True, (224, 224, 224))
             width = len(text) * char_width + (len(text) - 1) * char_sep_width
             x = (self.sidebar_surf.get_width() - width) / 2
             self.sidebar_surf.blit(label, (x, y))
@@ -276,7 +279,7 @@ class Match3GUI:
     def update_sidebar(self) -> None:
         self.draw_sidebar()
         self.game_surf.blit(self.sidebar_surf, (self.game_surf.get_height(), 0))
-        self.screen_surf.blit(self.game_surf, (0, 0))
+        self.screen_surf.blit(self.game_surf, self.game_surf_pos)
         pygame.display.flip()
 
     def update_screen(self) -> None:
@@ -286,7 +289,7 @@ class Match3GUI:
         self.draw_sidebar()
         self.game_surf.blit(self.board_surf, (self.board_surf.get_width() * (1 - self.board_scale) / 2, self.board_surf.get_height() * (1 - self.board_scale) / 2))
         self.game_surf.blit(self.sidebar_surf, (self.game_surf.get_height(), 0))
-        self.screen_surf.blit(self.game_surf, (0, 0))
+        self.screen_surf.blit(self.game_surf, self.game_surf_pos)
         pygame.display.flip()
 
     def process_events(self, fps: int = -1, mouse: bool = False) -> bool:
@@ -316,9 +319,9 @@ class Match3GUI:
                 if event.button != 1:
                     continue
                 if self.mouse_state == MouseState.WAITING:
-                    self.board_pos_src = self.win_pos_to_board_pos(*event.pos)
+                    self.board_pos_src = self.win_pos_to_board_pos(*event.pos, True)
                     # Check that the mouse is inside a circle
-                    circle_center = self.board_pos_to_win_pos(*self.board_pos_src, shift=True)
+                    circle_center = self.board_pos_to_win_pos(*self.board_pos_src, True)
                     pic = self.point_inside_circle(event.pos, circle_center, int(self.circle_radius * self.circle_line_thickness))
                     if pic:
                         self.mouse_state = MouseState.PRESSED
@@ -326,7 +329,7 @@ class Match3GUI:
                 if self.mouse_state == MouseState.PRESSED:
                     self.mouse_state = MouseState.MOVING
                 if self.mouse_state == MouseState.MOVING:
-                    board_pos_dst = self.win_pos_to_board_pos(*event.pos)
+                    board_pos_dst = self.win_pos_to_board_pos(*event.pos, True)
                     # Check that the mouse was dragged to a different position in the board
                     if self.board_pos_src == board_pos_dst:
                         continue
@@ -342,7 +345,7 @@ class Match3GUI:
                         print(f"Swap not valid: destination is not a neighbor.")
                         self.mouse_state = MouseState.WAITING
                         continue
-                    circle_center = self.board_pos_to_win_pos(*board_pos_dst, shift=True)
+                    circle_center = self.board_pos_to_win_pos(*board_pos_dst, True)
                     pic = self.point_inside_circle(event.pos, circle_center, int(self.circle_radius * self.circle_line_thickness))
                     # Check that the mouse is inside the neighbor's circle
                     if pic:
@@ -365,16 +368,19 @@ class Match3GUI:
             elif event.type == pygame.VIDEORESIZE:
                 # Calculate new screen size
                 sw, sh = event.size
-                if event.w < self.min_width:
-                    sw = self.min_width
-                if event.h < self.min_height:
-                    sh = self.min_height
+                #if event.w < self.min_width:
+                #    sw = self.min_width
+                #if event.h < self.min_height:
+                #    sh = self.min_height
                 # Calculate and update new game size
                 gw, gh = sw, sh
+                self.game_surf_pos = [0, 0]
                 if sw / sh > self.game_ratio:
                     gw = int(sh * self.game_ratio)
+                    self.game_surf_pos[0] = (sw - gw) / 2
                 else:
                     gh = int(sw / self.game_ratio)
+                    self.game_surf_pos[1] = (sh - gh) / 2
                 self.game_surf = pygame.Surface((gw, gh), pygame.HWSURFACE)  # Update game surface
                 # Calculate and update new board size and new circle radius
                 bw, bh = gh, gh
@@ -385,7 +391,7 @@ class Match3GUI:
                 sbw, sbh = gw - gh, gh
                 self.sidebar_surf = pygame.Surface((sbw, sbh), pygame.HWSURFACE)  # Update sidebar surface
                 # Update screen surface
-                self.screen_surf = pygame.display.set_mode((sw, sh), self.flags, vsync=1)
+                #self.screen_surf = pygame.display.set_mode((sw, sh), self.flags, vsync=1)
                 # Fill surfaces with background color
                 self.screen_surf.fill(self.background_color["screen"])
                 self.game_surf.fill(self.background_color["game"])

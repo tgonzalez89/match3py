@@ -51,12 +51,12 @@ Audio
         timer about to run?
     Settings/Preferences -> turn on/off music and effects
 
-Resizing
-    Doesn't work very well in Linux
-    Test not forcing the window size to a specific shape.
+#Resizing
+    #Doesn't work very well in Linux
+    #Test not forcing the window size to a specific shape.
         #Window shape (ratio) shouldn't matter, adapt GUI to it.
             #Either stretch or expand stuff or have a fixed ratio and put black bars at top/bottom or left/right depending on size.
-                Need to center black bars at top/bottom/left/right, right now there is only one black bar at bottom/right
+                #Need to center black bars at top/bottom/left/right, right now there is only one black bar at bottom/right
 
 Hint button that lights up after X amount of seconds
     Highlights a circle that can be swapped. Not best play, just a random play.
