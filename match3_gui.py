@@ -37,6 +37,7 @@ class Match3GUI:
     starting_height = 480
     game_ratio = 4 / 3
     board_scale = 0.9
+    plus_score_ani_time = 500
     hint_ani_time = 200
     swap_ani_time = 200
     shift_down_ani_time = 200
@@ -71,6 +72,10 @@ class Match3GUI:
         self.hint_button = None
         self.hint = False
         self.hint_cut_score = False
+        self.plus_score_ani_time_start = 0
+        self.curr_plus_score_ani_time = 0
+        self.curr_score = 0
+        self.curr_time_score = 0
 
     ### Animate functions
 
@@ -81,7 +86,7 @@ class Match3GUI:
         curr_ani_time = 0
         ani_time_start = pygame.time.get_ticks()
 
-        while curr_ani_time < self.hint_ani_time:
+        while curr_ani_time <= self.hint_ani_time:
             if self.process_events():
                 self.screen_surf.fill(self.background_color["screen"])
                 self.game_surf.fill(self.background_color["game"])
@@ -151,7 +156,7 @@ class Match3GUI:
 
             pygame.display.flip()
 
-    def animate_clear(self, board_points: list[tuple[int, int]]) -> None:
+    def animate_clear(self, board_points: list[tuple[int, int]], no_more_moves: bool = False) -> None:
         win_points = [self.board_pos_to_win_pos(*p) for p in board_points]
 
         target_transparency = 0
@@ -161,6 +166,10 @@ class Match3GUI:
 
         curr_ani_time = 0
         ani_time_start = pygame.time.get_ticks()
+
+        clear_ani_time = self.clear_ani_time
+        if no_more_moves:
+            clear_ani_time *= 5
 
         while curr_transparency != target_transparency or curr_size != target_size:
             if self.process_events():
@@ -174,10 +183,10 @@ class Match3GUI:
             curr_ani_time = pygame.time.get_ticks() - ani_time_start
 
             # Calculate the new size and the new transparency
-            curr_transparency = int(target_transparency * (1 - curr_ani_time / self.clear_ani_time))
+            curr_transparency = int(target_transparency * (1 - curr_ani_time / clear_ani_time))
             if curr_transparency > target_transparency:
                 curr_transparency = target_transparency
-            curr_size = int(self.circle_radius * (1 - curr_ani_time / self.clear_ani_time))
+            curr_size = int(self.circle_radius * (1 - curr_ani_time / clear_ani_time))
             if curr_size < target_size:
                 curr_size = target_size
 
@@ -187,6 +196,39 @@ class Match3GUI:
                 if color_index < 0:
                     continue
                 self.draw_circle(win_points[i][0], win_points[i][1], self.colors[color_index], curr_size)
+
+            if no_more_moves:
+                min_font_size = 20
+                min_char_width = 13.8
+                min_char_height = 13.5
+                min_char_sep_height = min_char_height / 2
+
+                font_size = min_font_size * self.game_surf.get_width() / self.starting_width
+                char_width = min_char_width * self.game_surf.get_width() / self.starting_width
+                char_height = min_char_height * self.game_surf.get_height() / self.starting_height
+                char_sep_height = min_char_sep_height * self.game_surf.get_height() / self.starting_height
+
+                font = pygame.font.SysFont("monospace", int(font_size))
+                font.set_bold(True)
+
+                buttons = [None, None]
+                texts = ("NO MORE MOVES", "REGENERATING BOARD")
+                width = max([len(text) for text in texts]) * char_width
+                height = char_height + char_sep_height
+                x = (self.board_surf.get_width() - width) / 2 + self.board_surf.get_abs_offset()[0]
+                y = (self.board_surf.get_height() - height * 2) / 2 + self.board_surf.get_abs_offset()[1]
+                for i, text in enumerate(texts):
+                    buttons[i] = pygamew.Button(
+                        self.screen_surf, x, y, width, height,
+                        text=text,
+                        textColour=(32, 255, 32),
+                        font=font,
+                        colour=self.background_color["game"],
+                        hoverColour=self.background_color["game"],
+                        pressedColour=self.background_color["game"]
+                    )
+                    buttons[i].draw()
+                    y += height
 
             pygame.display.flip()
 
@@ -199,9 +241,7 @@ class Match3GUI:
 
         curr_pos = [[x, y] for (x, y) in win_points_src]
 
-        ani_time = self.shift_down_ani_time / num_vertical_points
-        if ani_time < 100:
-            ani_time = 100
+        ani_time = self.shift_down_ani_time / min((num_vertical_points, 2))
         curr_ani_time = 0
         ani_time_start = pygame.time.get_ticks()
 
@@ -267,13 +307,11 @@ class Match3GUI:
     def draw_sidebar(self) -> None:
         min_font_size = 20
         min_char_width = 13.8
-        min_char_sep_width = 0
         min_char_height = 13.8
         min_char_sep_height = min_char_height / 2
 
         font_size = min_font_size * self.game_surf.get_width() / self.starting_width
         char_width = min_char_width * self.game_surf.get_width() / self.starting_width
-        char_sep_width = min_char_sep_width * self.game_surf.get_width() / self.starting_width
         char_height = min_char_height * self.game_surf.get_height() / self.starting_height
         char_sep_height = min_char_sep_height * self.game_surf.get_height() / self.starting_height
 
@@ -283,20 +321,26 @@ class Match3GUI:
         font.set_bold(True)
 
         y = self.sidebar_surf.get_height() * 0.2
-        for text in ("SCORE", str(self.score), "TIME LEFT", str(self.time_left_sec)):
-            if text == "TIME LEFT":
+        for i, text in enumerate(("SCORE", str(self.score), "TIME LEFT", str(self.time_left_sec))):
+            if i == 2:
                 y += char_height + char_sep_height
             label = font.render(text, True, (224, 224, 224))
-            width = len(text) * char_width + (len(text) - 1) * char_sep_width
+            width = len(text) * char_width
             x = (self.sidebar_surf.get_width() - width) / 2
             self.sidebar_surf.blit(label, (x, y))
+            if self.curr_plus_score_ani_time <= self.plus_score_ani_time:
+                if i == 1 or i == 3:
+                    label = font.render("+" + str({1: self.curr_score, 3: self.curr_time_score / 1000}.get(i)), True, (255, 255, 0))
+                    x += width
+                    self.sidebar_surf.blit(label, (x, y))
+                self.curr_plus_score_ani_time = pygame.time.get_ticks() - self.plus_score_ani_time_start
             y += char_height + char_sep_height
 
         y += char_height + char_sep_height
         y += char_height + char_sep_height
 
-        for text in ("PAUSE", "HINT"):
-            width = (len(text) + 1) * char_width + len(text) * char_sep_width
+        for i, text in enumerate(("PAUSE", "HINT")):
+            width = (len(text) + 1) * char_width
             height = char_height + char_sep_height
             x = (self.sidebar_surf.get_width() - width) / 2 + self.sidebar_surf.get_abs_offset()[0]
             y_abs = y + self.sidebar_surf.get_abs_offset()[1]
@@ -310,12 +354,12 @@ class Match3GUI:
                 pressedColour=(128, 128, 128),
                 borderColour=(0, 0, 0),
                 borderThickness=2 * int(self.game_surf.get_width() / self.starting_width),
-                onRelease={"PAUSE": self.pause_clicked, "HINT": self.hint_clicked}.get(text)
+                onRelease={0: self.pause_clicked, 1: self.hint_clicked}.get(i)
             )
-            if text == "PAUSE":
+            if i == 0:
                 self.pause_button = button
                 self.pause_button.draw()
-            elif text == "HINT":
+            elif i == 1:
                 self.hint_button = button
                 self.hint_button.draw()
             y += char_height + char_sep_height
@@ -477,7 +521,6 @@ class Match3GUI:
                             swap_valid = True
                             break
                     if not swap_valid:
-                        print(f"Swap not valid: destination is not a neighbor.")
                         self.mouse_state = MouseState.WAITING
                         continue
                     # Do the swap, if it was not a valid play, revert it
@@ -485,7 +528,6 @@ class Match3GUI:
                     self.animate_swap(self.board_pos_src, tuple(board_pos_dst))
                     self.board.swap(self.board_pos_src, board_pos_dst)
                     if not swap_valid:
-                        print(f"Swap not valid: No match3 groups found.")
                         self.animate_swap(tuple(board_pos_dst), self.board_pos_src)
                         self.board.swap(board_pos_dst, self.board_pos_src)
                     self.mouse_state = MouseState.WAITING
@@ -529,14 +571,16 @@ class Match3GUI:
             groups = self.board.get_valid_groups()
             while len(groups) > 0:
                 # Calculate the score from the match3 groups, add extra time poportional to the score
-                curr_score = self.board.calc_score(groups)
-                curr_time_score = curr_score * 100
+                self.curr_score = self.board.calc_score(groups)
+                self.curr_time_score = self.curr_score * 100
                 if self.hint_cut_score:
-                    curr_score //= 2
-                    curr_time_score //= 2
+                    self.curr_score //= 2
+                    self.curr_time_score = self.curr_score * 100
                     self.hint_cut_score = False
-                self.score += curr_score
-                self.time_score += curr_time_score
+                self.score += self.curr_score
+                self.time_score += self.curr_time_score
+                self.plus_score_ani_time_start = pygame.time.get_ticks()
+                self.curr_plus_score_ani_time = 0
                 self.update_sidebar()
                 # Clear the tiles that create a match3 group
                 points = [point for group in groups for point in group]
@@ -544,18 +588,16 @@ class Match3GUI:
                 self.board.clear(points)
                 # Shift down the tiles that are floating and create new tiles in the top row
                 # Do this until the board is filled
-                num_vertical_points = self.get_num_vertical_points(points)
                 while not self.board.is_full():
                     shifted = self.board.shift_down()
                     shifted += self.board.populate(rows=[0, 1], no_valid_play_check=False, no_match3_group_check=False)
-                    self.animate_shift_down(shifted, num_vertical_points)
+                    self.animate_shift_down(shifted, self.get_num_vertical_points(points))
                 groups = self.board.get_valid_groups()
 
             # Check if there is a valid play, if not, regenerate the board
             play = self.board.find_a_play()
             if len(play) == 0:
-                print(f"No more moves. Regenerating the board.")
-                self.animate_clear([(x, y) for y in range(self.board.rows) for x in range(self.board.cols)])
+                self.animate_clear([(x, y) for y in range(self.board.rows) for x in range(self.board.cols)], True)
                 self.board.clear()
                 try:
                     self.board.populate()
