@@ -32,16 +32,18 @@ class Match3GUI:
         "board": (0, 0, 0),
         "sidebar": (32, 32, 32),
     }
+    hint_color = (255, 255, 255)
     starting_width = 640
     starting_height = 480
     game_ratio = 4 / 3
     board_scale = 0.9
+    hint_ani_time = 200
     swap_ani_time = 200
     shift_down_ani_time = 200
     clear_ani_time = 200
     ani_fps = 360
     main_loop_refresh_rate = 30
-    circle_line_thickness = 19 / 20
+    circle_line_thickness = 18 / 20
     flags = pygame.RESIZABLE | pygame.HWSURFACE
 
     def __init__(self, side_len: int = 7) -> None:
@@ -67,8 +69,40 @@ class Match3GUI:
         self.game_surf_pos = [0, 0]
         self.pause_button = None
         self.hint_button = None
+        self.hint = False
+        self.hint_cut_score = False
 
     ### Animate functions
+
+    def animate_hint(self, board_point1: tuple[int, int], board_point2: tuple[int, int]) -> None:
+        board_points = (board_point1, board_point2)
+        win_points = (list(self.board_pos_to_win_pos(*board_points[0])), list(self.board_pos_to_win_pos(*board_points[1])))
+
+        curr_ani_time = 0
+        ani_time_start = pygame.time.get_ticks()
+
+        while curr_ani_time < self.hint_ani_time:
+            if self.process_events():
+                self.screen_surf.fill(self.background_color["screen"])
+                self.game_surf.fill(self.background_color["game"])
+                self.draw_sidebar()
+                win_points = (list(self.board_pos_to_win_pos(*board_points[0])), list(self.board_pos_to_win_pos(*board_points[1])))
+
+            self.draw_board(no_draw_pts=board_points)
+
+            curr_ani_time = pygame.time.get_ticks() - ani_time_start
+
+            for p_i in range(2):
+                color_index = self.board.board[board_points[p_i][1]][board_points[p_i][0]]
+                if color_index < 0:
+                    continue
+                self.draw_circle(*win_points[p_i], self.hint_color, self.circle_radius / self.circle_line_thickness)
+                self.draw_circle(*win_points[p_i], self.colors[color_index])
+
+            pygame.display.flip()
+
+        self.update_board()
+
 
     def animate_swap(self, board_point1: tuple[int, int], board_point2: tuple[int, int]) -> None:
         board_points = (board_point1, board_point2)
@@ -276,7 +310,7 @@ class Match3GUI:
                 pressedColour=(128, 128, 128),
                 borderColour=(0, 0, 0),
                 borderThickness=2 * int(self.game_surf.get_width() / self.starting_width),
-                onClick=lambda: print("Click")
+                onRelease={"PAUSE": self.pause_clicked, "HINT": self.hint_clicked}.get(text)
             )
             if text == "PAUSE":
                 self.pause_button = button
@@ -341,6 +375,12 @@ class Match3GUI:
         return max(points_in_line.values())
 
 ### Other functions
+
+    def pause_clicked(self) -> None:
+        print(f"Pause Clicked")
+
+    def hint_clicked(self) -> None:
+        self.hint = True
 
     def resize_surfaces(self) -> None:
         # Calculate new screen size
@@ -416,35 +456,39 @@ class Match3GUI:
                 if self.mouse_state == MouseState.PRESSED:
                     self.mouse_state = MouseState.MOVING
                 if self.mouse_state == MouseState.MOVING:
-                    board_pos_dst = self.win_pos_to_board_pos(*event.pos, True)
+                    board_pos_dst = list(self.win_pos_to_board_pos(*event.pos, True))
                     # Check that the mouse was dragged to a different position in the board
-                    if self.board_pos_src == board_pos_dst:
+                    if list(self.board_pos_src) == board_pos_dst:
+                        continue
+                    # If the mouse went to far, move the dst pos back to a neighbor
+                    for i in range(2):
+                        if self.board_pos_src[i] - board_pos_dst[i] > 1:
+                            board_pos_dst[i] = self.board_pos_src[i] - 1
+                        elif self.board_pos_src[i] - board_pos_dst[i] < -1:
+                            board_pos_dst[i] = self.board_pos_src[i] + 1
+                    if self.board.out_of_bounds(*board_pos_dst):
                         continue
                     # Check that the new position is a neighbor
                     swap_valid = False
                     for (x, y) in ((-1, 0), (1, 0), (0, -1), (0, 1)):
                         neigh_x = self.board_pos_src[0] + x
                         neigh_y = self.board_pos_src[1] + y
-                        if (neigh_x, neigh_y) == board_pos_dst:
+                        if [neigh_x, neigh_y] == board_pos_dst:
                             swap_valid = True
                             break
                     if not swap_valid:
                         print(f"Swap not valid: destination is not a neighbor.")
                         self.mouse_state = MouseState.WAITING
                         continue
-                    circle_center = self.board_pos_to_win_pos(*board_pos_dst, True)
-                    pic = self.point_inside_circle(event.pos, circle_center, int(self.circle_radius * self.circle_line_thickness))
-                    # Check that the mouse is inside the neighbor's circle
-                    if pic:
-                        # Do the swap, if it was not a valid play, revert it
-                        swap_valid = self.board.is_swap_valid(self.board_pos_src, board_pos_dst)
-                        self.animate_swap(self.board_pos_src, board_pos_dst)
-                        self.board.swap(self.board_pos_src, board_pos_dst)
-                        if not swap_valid:
-                            print(f"Swap not valid: No match3 groups found.")
-                            self.animate_swap(board_pos_dst, self.board_pos_src)
-                            self.board.swap(board_pos_dst, self.board_pos_src)
-                        self.mouse_state = MouseState.WAITING
+                    # Do the swap, if it was not a valid play, revert it
+                    swap_valid = self.board.is_swap_valid(self.board_pos_src, board_pos_dst)
+                    self.animate_swap(self.board_pos_src, tuple(board_pos_dst))
+                    self.board.swap(self.board_pos_src, board_pos_dst)
+                    if not swap_valid:
+                        print(f"Swap not valid: No match3 groups found.")
+                        self.animate_swap(tuple(board_pos_dst), self.board_pos_src)
+                        self.board.swap(board_pos_dst, self.board_pos_src)
+                    self.mouse_state = MouseState.WAITING
             elif mouse and event.type == pygame.MOUSEBUTTONUP:
                 if event.button != 1:
                     continue
@@ -486,8 +530,12 @@ class Match3GUI:
             while len(groups) > 0:
                 # Calculate the score from the match3 groups, add extra time poportional to the score
                 curr_score = self.board.calc_score(groups)
-                self.score += curr_score
                 curr_time_score = curr_score * 100
+                if self.hint_cut_score:
+                    curr_score //= 2
+                    curr_time_score //= 2
+                    self.hint_cut_score = False
+                self.score += curr_score
                 self.time_score += curr_time_score
                 self.update_sidebar()
                 # Clear the tiles that create a match3 group
@@ -516,6 +564,14 @@ class Match3GUI:
                     pygame.quit()
                     exit(1)
                 self.update_board()
+
+            if self.hint:
+                play = self.board.find_a_play()
+                if len(play) > 0:
+                    (swap_points, groups) = play
+                    self.animate_hint(*swap_points)
+                self.hint = False
+                self.hint_cut_score = True
 
             # Let the computer play (for debug)
             # play = self.board.find_better_play()
