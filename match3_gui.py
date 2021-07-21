@@ -307,28 +307,6 @@ class Match3GUI:
         self.draw_screen()
         pygame.display.flip()
 
-    ### Other functions
-
-    def resize_surfaces(self) -> None:
-        # Calculate new screen size
-        sw, sh = self.screen_surf.get_size()
-        gw, gh = sw, sh
-        self.game_surf_pos = [0, 0]
-        if sw / sh > self.game_ratio:
-            gw = int(sh * self.game_ratio)
-            self.game_surf_pos[0] = (sw - gw) / 2
-        else:
-            gh = int(sw / self.game_ratio)
-            self.game_surf_pos[1] = (sh - gh) / 2
-        self.game_surf = self.screen_surf.subsurface((self.game_surf_pos[0], self.game_surf_pos[1], gw, gh))
-        # Calculate and update new board size and new circle radius
-        pos = int(gh * (1 - self.board_scale) / 2)
-        side = int(gh * self.board_scale)
-        self.board_surf = self.game_surf.subsurface((pos, pos, side, side))
-        self.circle_radius = self.board_surf.get_height() / self.board.cols / 2
-        # Calculate and update new sidebar size
-        self.sidebar_surf = self.game_surf.subsurface((gh, 0, gw - gh, gh))
-
     ### Helper functions
 
     def win_pos_to_board_pos(self, win_pos_x: int, win_pos_y: int, relative_to_window: bool = False) -> tuple[int, int]:
@@ -361,6 +339,28 @@ class Match3GUI:
         for (col, _) in points:
             points_in_line[col] = points_in_line.get(col, 0) + 1
         return max(points_in_line.values())
+
+### Other functions
+
+    def resize_surfaces(self) -> None:
+        # Calculate new screen size
+        sw, sh = self.screen_surf.get_size()
+        gw, gh = sw, sh
+        self.game_surf_pos = [0, 0]
+        if sw / sh > self.game_ratio:
+            gw = int(sh * self.game_ratio)
+            self.game_surf_pos[0] = (sw - gw) / 2
+        else:
+            gh = int(sw / self.game_ratio)
+            self.game_surf_pos[1] = (sh - gh) / 2
+        self.game_surf = self.screen_surf.subsurface((self.game_surf_pos[0], self.game_surf_pos[1], gw, gh))
+        # Calculate and update new board size and new circle radius
+        pos = int(gh * (1 - self.board_scale) / 2)
+        side = int(gh * self.board_scale)
+        self.board_surf = self.game_surf.subsurface((pos, pos, side, side))
+        self.circle_radius = self.board_surf.get_height() / self.board.cols / 2
+        # Calculate and update new sidebar size
+        self.sidebar_surf = self.game_surf.subsurface((gh, 0, gw - gh, gh))
 
     ### Main functions
 
@@ -489,7 +489,7 @@ class Match3GUI:
                 self.score += curr_score
                 curr_time_score = curr_score * 100
                 self.time_score += curr_time_score
-                self.draw_sidebar()
+                self.update_sidebar()
                 # Clear the tiles that create a match3 group
                 points = [point for group in groups for point in group]
                 self.animate_clear(points)
