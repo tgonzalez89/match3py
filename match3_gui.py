@@ -1,4 +1,5 @@
 import pygame
+import pygame_widgets as pygamew
 from pygame import gfxdraw
 from enum import Enum, auto
 from match3_board import Match3Board
@@ -31,8 +32,8 @@ class Match3GUI:
         "board": (0, 0, 0),
         "sidebar": (32, 32, 32),
     }
-    min_width = 640
-    min_height = 480
+    starting_width = 640
+    starting_height = 480
     game_ratio = 4 / 3
     board_scale = 0.9
     swap_ani_time = 200
@@ -58,54 +59,16 @@ class Match3GUI:
         self.mouse_state = MouseState.WAITING
         self.board_pos_src = None
         self.score = 0
-        self.curr_score = 0
         self.time_init = 60000
         self.time_left = self.time_init
         self.time_start = 0
         self.time_score = 0
-        self.curr_time_score = 0
-        self.prev_time_left_sec = self.time_left // 1000
+        self.time_left_sec = self.time_left // 1000
         self.game_surf_pos = [0, 0]
+        self.pause_button = None
+        self.hint_button = None
 
-    def win_pos_to_board_pos(self, win_pos_x: int, win_pos_y: int, relative_to_window: bool = False) -> tuple[int, int]:
-        if relative_to_window:
-            shift_board2game = self.board_surf.get_width() * (1 - self.board_scale) / 2
-            win_pos_x -= shift_board2game + self.game_surf_pos[0]
-            win_pos_y -= shift_board2game + self.game_surf_pos[1]
-        col_w = self.board_surf.get_width() / self.board.cols
-        row_h = self.board_surf.get_height() / self.board.rows
-        board_pos_x = (win_pos_x - col_w / 2) / col_w
-        board_pos_y = (win_pos_y - row_h / 2) / row_h
-        return (int(round(board_pos_x)), int(round(board_pos_y)))
-
-    def board_pos_to_win_pos(self, board_pos_x: int, board_pos_y: int, relative_to_window: bool = False) -> tuple[int, int]:
-        col_w = self.board_surf.get_width() / self.board.cols
-        row_h = self.board_surf.get_height() / self.board.rows
-        win_pos_x = board_pos_x * col_w + col_w / 2
-        win_pos_y = board_pos_y * row_h + row_h / 2
-        shift_board2game = 0
-        if relative_to_window:
-            shift_board2game = self.board_surf.get_width() * (1 - self.board_scale) / 2
-            win_pos_x += shift_board2game + self.game_surf_pos[0]
-            win_pos_y += shift_board2game + self.game_surf_pos[1]
-        return (int(win_pos_x), int(win_pos_y))
-
-    def point_inside_circle(self, point: tuple[int, int], circle_center: tuple[int, int], r) -> bool:
-        x, y = point
-        c_x, c_y = circle_center
-        return (x - c_x)**2 + (y - c_y)**2 < r**2
-
-    def draw_circle(self, x, y, color, radius = None) -> None:
-        if radius is None:
-            radius = self.circle_radius
-        if color != (0, 0, 0):
-            gfxdraw.aacircle(self.board_surf, x, y, int(radius * self.circle_line_thickness), color)
-            gfxdraw.filled_circle(self.board_surf, x, y, int(radius * self.circle_line_thickness), color)
-        else:
-            gfxdraw.aacircle(self.board_surf, x, y, int(radius * self.circle_line_thickness), self.border_color)
-            gfxdraw.filled_circle(self.board_surf, x, y, int(radius * self.circle_line_thickness), self.border_color)
-            gfxdraw.aacircle(self.board_surf, x, y, int(radius * (1 - (1 - self.circle_line_thickness) * 2)), color)
-            gfxdraw.filled_circle(self.board_surf, x, y, int(radius * (1 - (1 - self.circle_line_thickness) * 2)), color)
+    ### Animate functions
 
     def animate_swap(self, board_point1: tuple[int, int], board_point2: tuple[int, int]) -> None:
         board_points = (board_point1, board_point2)
@@ -122,6 +85,9 @@ class Match3GUI:
 
         while curr_pos[0] != win_points[1] or curr_pos[1] != win_points[0]:  # curr_p1 != dst_p1 or curr_p2 != dst_p2
             if self.process_events():
+                self.screen_surf.fill(self.background_color["screen"])
+                self.game_surf.fill(self.background_color["game"])
+                self.draw_sidebar()
                 win_points = (list(self.board_pos_to_win_pos(*board_points[0])), list(self.board_pos_to_win_pos(*board_points[1])))
                 target_dist = (
                     [win_points[1][0] - win_points[0][0], win_points[1][1] - win_points[0][1]],  # [dst_p1_x - src_p1_x, dst_p1_y - src_p1_y]
@@ -149,8 +115,6 @@ class Match3GUI:
                     continue
                 self.draw_circle(curr_pos[p_i][0], curr_pos[p_i][1], self.colors[color_index])
 
-            self.game_surf.blit(self.board_surf, (self.board_surf.get_width() * (1 - self.board_scale) / 2, self.board_surf.get_height() * (1 - self.board_scale) / 2))
-            self.screen_surf.blit(self.game_surf, self.game_surf_pos)
             pygame.display.flip()
 
     def animate_clear(self, board_points: list[tuple[int, int]]) -> None:
@@ -166,6 +130,9 @@ class Match3GUI:
 
         while curr_transparency != target_transparency or curr_size != target_size:
             if self.process_events():
+                self.screen_surf.fill(self.background_color["screen"])
+                self.game_surf.fill(self.background_color["game"])
+                self.draw_sidebar()
                 win_points = [self.board_pos_to_win_pos(*p) for p in board_points]
 
             self.draw_board(no_draw_pts=board_points)
@@ -187,8 +154,6 @@ class Match3GUI:
                     continue
                 self.draw_circle(win_points[i][0], win_points[i][1], self.colors[color_index], curr_size)
 
-            self.game_surf.blit(self.board_surf, (self.board_surf.get_width() * (1 - self.board_scale) / 2, self.board_surf.get_height() * (1 - self.board_scale) / 2))
-            self.screen_surf.blit(self.game_surf, self.game_surf_pos)
             pygame.display.flip()
 
     def animate_shift_down(self, shifted_bp: list[tuple[int, int]], num_vertical_points: int) -> None:
@@ -208,6 +173,9 @@ class Match3GUI:
 
         while any([curr_pos[i] != win_points_dst[i] for i in range(len(curr_pos))]):
             if self.process_events():
+                self.screen_surf.fill(self.background_color["screen"])
+                self.game_surf.fill(self.background_color["game"])
+                self.draw_sidebar()
                 win_points_dst = [list(self.board_pos_to_win_pos(*p)) for p in board_points_dst]
                 win_points_src = [list(self.board_pos_to_win_pos(*p)) for p in board_points_src]
 
@@ -233,12 +201,25 @@ class Match3GUI:
                     continue
                 self.draw_circle(curr_pos[p_i][0], curr_pos[p_i][1], self.colors[color_index])
 
-            self.game_surf.blit(self.board_surf, (self.board_surf.get_width() * (1 - self.board_scale) / 2, self.board_surf.get_height() * (1 - self.board_scale) / 2))
-            self.screen_surf.blit(self.game_surf, self.game_surf_pos)
             pygame.display.flip()
+
+    ### Draw functions
+
+    def draw_circle(self, x, y, color, radius = None) -> None:
+        if radius is None:
+            radius = self.circle_radius
+        if color != (0, 0, 0):
+            gfxdraw.aacircle(self.board_surf, x, y, int(radius * self.circle_line_thickness), color)
+            gfxdraw.filled_circle(self.board_surf, x, y, int(radius * self.circle_line_thickness), color)
+        else:
+            gfxdraw.aacircle(self.board_surf, x, y, int(radius * self.circle_line_thickness), self.border_color)
+            gfxdraw.filled_circle(self.board_surf, x, y, int(radius * self.circle_line_thickness), self.border_color)
+            gfxdraw.aacircle(self.board_surf, x, y, int(radius * (1 - (1 - self.circle_line_thickness) * 2)), color)
+            gfxdraw.filled_circle(self.board_surf, x, y, int(radius * (1 - (1 - self.circle_line_thickness) * 2)), color)
 
     def draw_board(self, no_draw_pts: list[tuple[int, int]] = None) -> None:
         self.board_surf.fill(self.background_color["board"])
+
         for row in range(self.board.rows):
             for col in range(self.board.cols):
                 if no_draw_pts is not None and (col, row) in no_draw_pts:
@@ -256,18 +237,19 @@ class Match3GUI:
         min_char_height = 13.8
         min_char_sep_height = min_char_height / 2
 
-        font_size = min_font_size * self.game_surf.get_width() / self.min_width
-        char_width = min_char_width * self.game_surf.get_width() / self.min_width
-        char_sep_width = min_char_sep_width * self.game_surf.get_width() / self.min_width
-        char_height = min_char_height * self.game_surf.get_height() / self.min_height
-        char_sep_height = min_char_sep_height * self.game_surf.get_height() / self.min_height
+        font_size = min_font_size * self.game_surf.get_width() / self.starting_width
+        char_width = min_char_width * self.game_surf.get_width() / self.starting_width
+        char_sep_width = min_char_sep_width * self.game_surf.get_width() / self.starting_width
+        char_height = min_char_height * self.game_surf.get_height() / self.starting_height
+        char_sep_height = min_char_sep_height * self.game_surf.get_height() / self.starting_height
 
         self.sidebar_surf.fill(self.background_color["sidebar"])
+
         font = pygame.font.SysFont("monospace", int(font_size))
         font.set_bold(True)
 
         y = self.sidebar_surf.get_height() * 0.2
-        for text in ("SCORE", str(self.score), "TIME LEFT", str(self.prev_time_left_sec)):
+        for text in ("SCORE", str(self.score), "TIME LEFT", str(self.time_left_sec)):
             if text == "TIME LEFT":
                 y += char_height + char_sep_height
             label = font.render(text, True, (224, 224, 224))
@@ -276,50 +258,155 @@ class Match3GUI:
             self.sidebar_surf.blit(label, (x, y))
             y += char_height + char_sep_height
 
-    def update_sidebar(self) -> None:
-        self.draw_sidebar()
-        self.game_surf.blit(self.sidebar_surf, (self.game_surf.get_height(), 0))
-        self.screen_surf.blit(self.game_surf, self.game_surf_pos)
-        pygame.display.flip()
+        y += char_height + char_sep_height
+        y += char_height + char_sep_height
 
-    def update_screen(self) -> None:
+        for text in ("PAUSE", "HINT"):
+            width = (len(text) + 1) * char_width + len(text) * char_sep_width
+            height = char_height + char_sep_height
+            x = (self.sidebar_surf.get_width() - width) / 2 + self.sidebar_surf.get_abs_offset()[0]
+            y_abs = y + self.sidebar_surf.get_abs_offset()[1]
+            button = pygamew.Button(
+                self.screen_surf, x, y_abs, width, height,
+                text=text,
+                textColour=(224, 224, 224),
+                font=font,
+                colour=(16, 16, 16),
+                hoverColour=(64, 64, 64),
+                pressedColour=(128, 128, 128),
+                borderColour=(0, 0, 0),
+                borderThickness=2 * int(self.game_surf.get_width() / self.starting_width),
+                onClick=lambda: print("Click")
+            )
+            if text == "PAUSE":
+                self.pause_button = button
+                self.pause_button.draw()
+            elif text == "HINT":
+                self.hint_button = button
+                self.hint_button.draw()
+            y += char_height + char_sep_height
+            y += char_height + char_sep_height
+
+    def draw_screen(self) -> None:
         self.screen_surf.fill(self.background_color["screen"])
         self.game_surf.fill(self.background_color["game"])
         self.draw_board()
         self.draw_sidebar()
-        self.game_surf.blit(self.board_surf, (self.board_surf.get_width() * (1 - self.board_scale) / 2, self.board_surf.get_height() * (1 - self.board_scale) / 2))
-        self.game_surf.blit(self.sidebar_surf, (self.game_surf.get_height(), 0))
-        self.screen_surf.blit(self.game_surf, self.game_surf_pos)
+
+    ### Update functions
+
+    def update_board(self) -> None:
+        self.draw_board()
         pygame.display.flip()
 
+    def update_sidebar(self) -> None:
+        self.draw_sidebar()
+        pygame.display.flip()
+
+    def update_screen(self) -> None:
+        self.draw_screen()
+        pygame.display.flip()
+
+    ### Other functions
+
+    def resize_surfaces(self) -> None:
+        # Calculate new screen size
+        sw, sh = self.screen_surf.get_size()
+        gw, gh = sw, sh
+        self.game_surf_pos = [0, 0]
+        if sw / sh > self.game_ratio:
+            gw = int(sh * self.game_ratio)
+            self.game_surf_pos[0] = (sw - gw) / 2
+        else:
+            gh = int(sw / self.game_ratio)
+            self.game_surf_pos[1] = (sh - gh) / 2
+        self.game_surf = self.screen_surf.subsurface((self.game_surf_pos[0], self.game_surf_pos[1], gw, gh))
+        # Calculate and update new board size and new circle radius
+        pos = int(gh * (1 - self.board_scale) / 2)
+        side = int(gh * self.board_scale)
+        self.board_surf = self.game_surf.subsurface((pos, pos, side, side))
+        self.circle_radius = self.board_surf.get_height() / self.board.cols / 2
+        # Calculate and update new sidebar size
+        self.sidebar_surf = self.game_surf.subsurface((gh, 0, gw - gh, gh))
+
+    ### Helper functions
+
+    def win_pos_to_board_pos(self, win_pos_x: int, win_pos_y: int, relative_to_window: bool = False) -> tuple[int, int]:
+        if relative_to_window:
+            win_pos_x -= self.board_surf.get_abs_offset()[0]
+            win_pos_y -= self.board_surf.get_abs_offset()[1]
+        col_w = self.board_surf.get_width() / self.board.cols
+        row_h = self.board_surf.get_height() / self.board.rows
+        board_pos_x = (win_pos_x - col_w / 2) / col_w
+        board_pos_y = (win_pos_y - row_h / 2) / row_h
+        return (int(round(board_pos_x)), int(round(board_pos_y)))
+
+    def board_pos_to_win_pos(self, board_pos_x: int, board_pos_y: int, relative_to_window: bool = False) -> tuple[int, int]:
+        col_w = self.board_surf.get_width() / self.board.cols
+        row_h = self.board_surf.get_height() / self.board.rows
+        win_pos_x = board_pos_x * col_w + col_w / 2
+        win_pos_y = board_pos_y * row_h + row_h / 2
+        if relative_to_window:
+            win_pos_x += self.board_surf.get_abs_offset()[0]
+            win_pos_y += self.board_surf.get_abs_offset()[1]
+        return (int(win_pos_x), int(win_pos_y))
+
+    def point_inside_circle(self, point: tuple[int, int], circle_center: tuple[int, int], r) -> bool:
+        x, y = point
+        c_x, c_y = circle_center
+        return (x - c_x)**2 + (y - c_y)**2 < r**2
+
+    def get_num_vertical_points(self, points: list[tuple[int, int]]) -> int:
+        points_in_line = dict()
+        for (col, _) in points:
+            points_in_line[col] = points_in_line.get(col, 0) + 1
+        return max(points_in_line.values())
+
+    ### Main functions
+
     def process_events(self, fps: int = -1, mouse: bool = False) -> bool:
-        # Wait until frame time
-        if fps < 0:
-            fps = self.ani_fps
-        self.clock.tick(fps)
+        update_display = False
 
         # Update the time left
         self.time_left = self.time_init + self.time_score - (pygame.time.get_ticks() - self.time_start)
+        if self.time_left_sec != int(round(self.time_left / 1000)):
+            self.time_left_sec = int(round(self.time_left / 1000))
+            if self.time_left_sec < 0:
+                self.time_left_sec = 0
+            self.draw_sidebar()
+            update_display = True
 
-        if self.prev_time_left_sec != int(round(self.time_left / 1000)):
-            self.prev_time_left_sec = int(round(self.time_left / 1000))
-            if self.prev_time_left_sec < 0:
-                self.prev_time_left_sec = 0
-            self.update_sidebar()
-
+        # End the game if the time has run out
         if self.time_left <= 0:
             print(f"Time's up. Final score: {self.score}")
             pygame.quit()
             exit()
 
+        events = pygame.event.get()
+        # Listen to button events
+        pbc = self.pause_button.colour
+        hbc = self.hint_button.colour
+        self.pause_button.listen(events)
+        self.hint_button.listen(events)
+        # Update color when hover/click
+        if pbc != self.pause_button.colour or hbc != self.hint_button.colour:
+            self.pause_button.draw()
+            self.hint_button.draw()
+            update_display = True
+
+        if update_display:
+            pygame.display.flip()
+
         # Process events
         ret = False
-        for event in pygame.event.get():
+        for event in events:
             if mouse and event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button != 1:
                     continue
                 if self.mouse_state == MouseState.WAITING:
                     self.board_pos_src = self.win_pos_to_board_pos(*event.pos, True)
+                    if self.board.out_of_bounds(*self.board_pos_src):
+                        continue
                     # Check that the mouse is inside a circle
                     circle_center = self.board_pos_to_win_pos(*self.board_pos_src, True)
                     pic = self.point_inside_circle(event.pos, circle_center, int(self.circle_radius * self.circle_line_thickness))
@@ -366,60 +453,24 @@ class Match3GUI:
                 elif self.mouse_state == MouseState.MOVING:
                     self.mouse_state = MouseState.WAITING
             elif event.type == pygame.VIDEORESIZE:
-                # Calculate new screen size
-                sw, sh = event.size
-                #if event.w < self.min_width:
-                #    sw = self.min_width
-                #if event.h < self.min_height:
-                #    sh = self.min_height
-                # Calculate and update new game size
-                gw, gh = sw, sh
-                self.game_surf_pos = [0, 0]
-                if sw / sh > self.game_ratio:
-                    gw = int(sh * self.game_ratio)
-                    self.game_surf_pos[0] = (sw - gw) / 2
-                else:
-                    gh = int(sw / self.game_ratio)
-                    self.game_surf_pos[1] = (sh - gh) / 2
-                self.game_surf = pygame.Surface((gw, gh), pygame.HWSURFACE)  # Update game surface
-                # Calculate and update new board size and new circle radius
-                bw, bh = gh, gh
-                bw, bh = int(bw * self.board_scale), int(bh * self.board_scale)
-                self.board_surf = pygame.Surface((bw, bh), pygame.HWSURFACE)  # Update board surface
-                self.circle_radius = self.board_surf.get_width() / self.board.cols / 2
-                # Calculate and update new sidebar size
-                sbw, sbh = gw - gh, gh
-                self.sidebar_surf = pygame.Surface((sbw, sbh), pygame.HWSURFACE)  # Update sidebar surface
-                # Update screen surface
-                #self.screen_surf = pygame.display.set_mode((sw, sh), self.flags, vsync=1)
-                # Fill surfaces with background color
-                self.screen_surf.fill(self.background_color["screen"])
-                self.game_surf.fill(self.background_color["game"])
-                self.board_surf.fill(self.background_color["board"])
-                self.sidebar_surf.fill(self.background_color["sidebar"])
+                self.resize_surfaces()
                 ret = True
             elif event.type == pygame.QUIT:
                 pygame.quit()
                 exit()
-        return ret
 
-    def get_num_vertical_points(self, points: list[tuple[int, int]]) -> int:
-        points_in_line = dict()
-        for (col, _) in points:
-            points_in_line[col] = points_in_line.get(col, 0) + 1
-        return max(points_in_line.values())
+        # Wait until frame time
+        if fps < 0:
+            fps = self.ani_fps
+        self.clock.tick(fps)
+
+        return ret
 
     def run(self) -> None:
         pygame.init()
         self.clock = pygame.time.Clock()
-
-        self.screen_surf = pygame.display.set_mode((self.min_width, self.min_height), self.flags, vsync=1)
-        self.game_surf = pygame.Surface((self.min_width, self.min_height), pygame.HWSURFACE)
-        bw, bh = int(self.min_height * self.board_scale), int(self.min_height * self.board_scale)
-        self.board_surf = pygame.Surface((bw, bh), pygame.HWSURFACE)
-        self.sidebar_surf = pygame.Surface((self.min_width - self.min_height, self.min_height), pygame.HWSURFACE)
-        self.circle_radius = self.board_surf.get_width() / self.board.cols / 2
-
+        self.screen_surf = pygame.display.set_mode((self.starting_width, self.starting_height), self.flags, vsync=1)
+        self.resize_surfaces()
         self.update_screen()
         self.time_start = pygame.time.get_ticks()
 
@@ -434,11 +485,11 @@ class Match3GUI:
             groups = self.board.get_valid_groups()
             while len(groups) > 0:
                 # Calculate the score from the match3 groups, add extra time poportional to the score
-                self.curr_score = self.board.calc_score(groups)
-                self.score += self.curr_score
-                self.curr_time_score = self.curr_score * 100
-                self.time_score += self.curr_time_score
-                self.update_sidebar()
+                curr_score = self.board.calc_score(groups)
+                self.score += curr_score
+                curr_time_score = curr_score * 100
+                self.time_score += curr_time_score
+                self.draw_sidebar()
                 # Clear the tiles that create a match3 group
                 points = [point for group in groups for point in group]
                 self.animate_clear(points)
@@ -464,7 +515,7 @@ class Match3GUI:
                     print(f"FATAL: Couldn't regenerate the the board.")
                     pygame.quit()
                     exit(1)
-                self.update_screen()
+                self.update_board()
 
             # Let the computer play (for debug)
             # play = self.board.find_better_play()
