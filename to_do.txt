@@ -22,8 +22,8 @@ Nicer GUI and effects
     #Show score somewhere.
     Maybe show high scores to beat.
     #Show timer.
-    Show some nice effect when adding to score or to timer. A flashy number next to it or make it bigger and change color for a moment.
-    Add transparency to fading when a match is done. https://stackoverflow.com/questions/6339057/draw-a-transparent-rectangle-in-pygame
+    #Show some nice effect when adding to score or to timer. A flashy number next to it or make it bigger and change color for a moment.
+    ##Add transparency to fading when a match is done. https://stackoverflow.com/questions/6339057/draw-a-transparent-rectangle-in-pygame
     #This will need to put extra stuff that is not the board, so the window can't be square anymore. Need to adapt win coords of board in all draw/animation functions.
     Buttom for Menu (pause)
     #Anti-aliasing: https://stackoverflow.com/questions/23852917/antialiasing-shapes-in-pygame
