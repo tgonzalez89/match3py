@@ -38,7 +38,7 @@ class Match3GUI:
     game_ratio = 4 / 3
     board_scale = 0.9
     plus_score_ani_time = 500
-    hint_ani_time = 200
+    hint_ani_time = 500
     swap_ani_time = 200
     shift_down_ani_time = 200
     clear_ani_time = 200
@@ -73,11 +73,21 @@ class Match3GUI:
         self.hint = False
         self.hint_cut_score = False
         self.plus_score_ani_time_start = 0
-        self.curr_plus_score_ani_time = 0
+        self.curr_plus_score_ani_time = self.plus_score_ani_time + 1
         self.curr_score = 0
         self.curr_time_score = 0
 
     ### Animate functions
+
+    def animate_plus_score_prev(self) -> None:
+        self.curr_plus_score_ani_time = self.plus_score_ani_time + 1
+        self.update_sidebar()
+        pygame.time.wait(100)
+
+    def animate_plus_score_post(self) -> None:
+        self.curr_plus_score_ani_time = 0
+        self.plus_score_ani_time_start = pygame.time.get_ticks()
+        self.update_sidebar()
 
     def animate_hint(self, board_point1: tuple[int, int], board_point2: tuple[int, int]) -> None:
         board_points = (board_point1, board_point2)
@@ -358,9 +368,11 @@ class Match3GUI:
             )
             if i == 0:
                 self.pause_button = button
+                self.pause_button.listen(None)
                 self.pause_button.draw()
             elif i == 1:
                 self.hint_button = button
+                self.hint_button.listen(None)
                 self.hint_button.draw()
             y += char_height + char_sep_height
             y += char_height + char_sep_height
@@ -460,18 +472,24 @@ class Match3GUI:
             self.draw_sidebar()
             update_display = True
 
+        # Remove plus score from sidebar if the ani time is up
+        if self.curr_plus_score_ani_time <= self.plus_score_ani_time:
+            self.curr_plus_score_ani_time = pygame.time.get_ticks() - self.plus_score_ani_time_start
+            if self.curr_plus_score_ani_time > self.plus_score_ani_time:
+                self.draw_sidebar()
+                update_display = True
+
         # End the game if the time has run out
         if self.time_left <= 0:
             print(f"Time's up. Final score: {self.score}")
             pygame.quit()
             exit()
 
-        events = pygame.event.get()
         # Listen to button events
         pbc = self.pause_button.colour
         hbc = self.hint_button.colour
-        self.pause_button.listen(events)
-        self.hint_button.listen(events)
+        self.pause_button.listen(None)
+        self.hint_button.listen(None)
         # Update color when hover/click
         if pbc != self.pause_button.colour or hbc != self.hint_button.colour:
             self.pause_button.draw()
@@ -483,7 +501,7 @@ class Match3GUI:
 
         # Process events
         ret = False
-        for event in events:
+        for event in pygame.event.get():
             if mouse and event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button != 1:
                     continue
@@ -570,6 +588,8 @@ class Match3GUI:
             # Do this until the board state is stabilized
             groups = self.board.get_valid_groups()
             while len(groups) > 0:
+                # Clear any old plus score in the sidbar
+                self.animate_plus_score_prev()
                 # Calculate the score from the match3 groups, add extra time poportional to the score
                 self.curr_score = self.board.calc_score(groups)
                 self.curr_time_score = self.curr_score * 100
@@ -579,9 +599,8 @@ class Match3GUI:
                     self.hint_cut_score = False
                 self.score += self.curr_score
                 self.time_score += self.curr_time_score
-                self.plus_score_ani_time_start = pygame.time.get_ticks()
-                self.curr_plus_score_ani_time = 0
-                self.update_sidebar()
+                # Show plus score in the sidebar
+                self.animate_plus_score_post()
                 # Clear the tiles that create a match3 group
                 points = [point for group in groups for point in group]
                 self.animate_clear(points)
@@ -608,11 +627,11 @@ class Match3GUI:
                 self.update_board()
 
             if self.hint:
+                self.hint = False
                 play = self.board.find_a_play()
                 if len(play) > 0:
                     (swap_points, groups) = play
                     self.animate_hint(*swap_points)
-                self.hint = False
                 self.hint_cut_score = True
 
             # Let the computer play (for debug)
