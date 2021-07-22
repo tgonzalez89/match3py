@@ -4,6 +4,7 @@ from pygame import gfxdraw
 from enum import Enum, auto
 from match3_board import Match3Board
 
+
 class MouseState(Enum):
     WAITING = auto()
     PRESSED = auto()
@@ -430,7 +431,7 @@ class Match3GUI:
             points_in_line[col] = points_in_line.get(col, 0) + 1
         return max(points_in_line.values())
 
-### Other functions
+    ### Other functions
 
     def pause_clicked(self) -> None:
         print(f"Pause Clicked")

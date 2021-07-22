@@ -1,6 +1,7 @@
 import copy
 import random
 
+
 class Match3Board:
     empty = ord(' ') - ord('a')
 
