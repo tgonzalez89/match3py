@@ -3,6 +3,8 @@ import pygame
 import pygame_widgets as pygamew
 from pygame import gfxdraw
 from enum import Enum, auto
+
+from pygame_widgets.button import Button
 from match3_board import Match3Board
 
 
@@ -56,8 +58,8 @@ class Match3GUI:
     swap_ani_time = 200
     shift_down_ani_time = 200
     clear_ani_time = 200
-    ani_fps = 360
-    main_loop_refresh_rate = 60
+    ani_fps = 60
+    main_loop_refresh_rate = 30
     circle_scale = 18 / 20
     flags = pygame.RESIZABLE | pygame.HWSURFACE
     min_font_size = 20
@@ -67,12 +69,8 @@ class Match3GUI:
     button_text_color = (255, 255, 255)
     time_init = 60000
 
-    def __init__(self, side_len: int = 7) -> None:
-        if side_len < 5:
-            raise ValueError("Minimum size is 5.")
-        if side_len > 13:
-            raise ValueError("Maximum size is 13.")
-        self.side_len = side_len
+    def __init__(self) -> None:
+        self.board = None
         self.circle_radius = 0
         self.screen_surf = None
         self.game_surf = None
@@ -101,6 +99,9 @@ class Match3GUI:
         self.char_sep_height = self.min_char_sep_height
         self.font = None
         self.pause = False
+        self.pause_time = 0
+        self.time_paused = 0
+        self.game_ended = False
 
     ### Animate functions
 
@@ -343,11 +344,11 @@ class Match3GUI:
         self.screen_surf.fill(self.background_color["screen"])
         self.game_surf.fill(self.background_color["game"])
 
-        texts = ["NEW GAME", "HIGH SCORES", "PREFERENCES", "ABOUT"]
+        texts = ["NEW GAME", "HIGH SCORES", "PREFERENCES", "ABOUT", "EXIT"]
         if self.game_state == GameState.PAUSED:
             texts = ["RESUME GAME"] + texts
-        y = (self.game_surf.get_height() - (len(texts) * (self.char_height + self.char_sep_height) * 4 - (self.char_height + self.char_sep_height) * 2)) / 2
-        self.draw_buttons(texts, y, 4, "game")
+        y = (self.game_surf.get_height() - (len(texts) * (self.char_height + self.char_sep_height) * 3.5 - (self.char_height + self.char_sep_height) * 2)) / 2
+        self.draw_buttons(texts, y, 3.5, "game")
 
     def draw_circle(self, x, y, color, radius = None) -> None:
         if radius is None:
@@ -409,6 +410,73 @@ class Match3GUI:
         texts = ("PAUSE", "HINT")
         self.draw_buttons(texts, y, 3, "sidebar")
 
+    def draw_ended(self) -> None:
+        self.game_surf.fill(self.background_color["game"])
+
+        y = self.game_surf.get_height() * 0.3
+        for text in ("TIME'S UP!", "YOUR SCORE:", str(self.score)):
+            width = len(text) * self.char_width
+            x = (self.game_surf.get_width() - width) / 2
+            label = self.font.render(text, True, self.button_text_color)
+            self.game_surf.blit(label, (x, y))
+            y += self.char_height + self.char_sep_height
+
+        y += (self.char_height + self.char_sep_height) * 2
+
+        texts = ("CONTINUE",)
+        self.draw_buttons(texts, y, 3, "game")
+
+    def draw_choose(self) -> None:
+        self.game_surf.fill(self.background_color["game"])
+
+        prev_dropdown = None
+        if "choose_board_size" in self.active_buttons:
+            prev_dropdown = self.active_buttons["choose_board_size"]
+
+        y = self.game_surf.get_height() * 0.7
+        texts = ("START",)
+        self.draw_buttons(texts, y, 3, "game")
+
+        y = self.game_surf.get_height() * 0.1
+        text = "Choose Board Size"
+        height = (self.char_height + self.char_sep_height) * 2
+        width = (len(text) + 4) * self.char_width
+        x = (self.game_surf.get_width() - width) / 2 + self.game_surf.get_abs_offset()[0]
+        y_abs = y + self.game_surf.get_abs_offset()[1]
+        border_thickness = int(2 * self.game_surf.get_width() / self.starting_width)
+        if border_thickness < 1:
+            border_thickness = 1
+        button_name = text.lower()
+        button_name = button_name.replace(' ', '_')
+        dropdown = pygamew.Dropdown(
+            self.screen_surf, x, y_abs, width, height,
+            name=text,
+            textColour=self.button_text_color,
+            font=self.font,
+            inactiveColour=(64, 64, 64),
+            hoverColour=(96, 96, 96),
+            pressedColour=(128, 128, 128),
+            borderColour=(0, 0, 0),
+            hoverBorderColour=(32, 32, 32),
+            pressedBorderColour=(64, 64, 64),
+            borderThickness=border_thickness,
+            choices=[f"{n}x{n}" for n in range(5, 14)],
+            values=[n for n in range(5, 14)]
+        )
+        if prev_dropdown is not None:
+            if prev_dropdown.chosen is not None:
+                idx = getattr(prev_dropdown, '_Dropdown__choices').index(prev_dropdown.chosen)
+                dropdown.chosen = getattr(dropdown, '_Dropdown__choices')[idx]
+            dropdown.dropped = prev_dropdown.dropped
+            dds = getattr(dropdown, '_Dropdown__choices') + [getattr(dropdown, '_Dropdown__main')]
+            dds_prev = getattr(prev_dropdown, '_Dropdown__choices') + [getattr(prev_dropdown, '_Dropdown__main')]
+            for i in range(len(dds)):
+                dds[i].colour = dds_prev[i].colour
+        dropdown.listen(None)
+        dropdown.draw()
+
+        self.active_buttons["choose_board_size"] = dropdown
+
     def draw_screen(self) -> None:
         self.screen_surf.fill(self.background_color["screen"])
         self.game_surf.fill(self.background_color["game"])
@@ -417,6 +485,10 @@ class Match3GUI:
         elif self.game_state == GameState.RUNNING:
             self.draw_board()
             self.draw_sidebar()
+        elif self.game_state == GameState.ENDED:
+            self.draw_ended()
+        elif self.game_state == GameState.CHOOSESIZE:
+            self.draw_choose()
 
     ### Update functions
 
@@ -468,7 +540,14 @@ class Match3GUI:
     # On click functions
 
     def new_game_clicked(self) -> None:
-        self.board = Match3Board(self.side_len, self.side_len, self.side_len-1)
+        self.game_state = GameState.CHOOSESIZE
+        self.update_screen()
+
+    def start_clicked(self) -> None:
+        size = self.active_buttons["choose_board_size"].getSelected()
+        if size is None:
+            return
+        self.board = Match3Board(size, size, size-1)
         self.score = 0
         self.time_left = self.time_init
         self.time_score = 0
@@ -479,7 +558,10 @@ class Match3GUI:
         self.curr_plus_score_ani_time = self.plus_score_ani_time + 1
         self.curr_score = 0
         self.curr_time_score = 0
+        self.time_paused = 0
+        self.pause = False
         self.game_state = GameState.RUNNING
+        self.resize_surfaces()
         self.update_screen()
         self.time_start = pygame.time.get_ticks()
 
@@ -501,9 +583,18 @@ class Match3GUI:
     def resume_game_clicked(self) -> None:
         self.game_state = GameState.RUNNING
         self.update_screen()
+        self.time_paused += pygame.time.get_ticks() - self.pause_time
 
     def hint_clicked(self) -> None:
         self.hint = True
+
+    def continue_clicked(self) -> None:
+        self.game_state = GameState.MAINMENU
+        self.update_screen()
+
+    def exit_clicked(self) -> None:
+        pygame.quit()
+        exit()
 
     ### Other functions
 
@@ -523,7 +614,8 @@ class Match3GUI:
         pos = gh * (1 - self.board_scale) / 2
         side = gh * self.board_scale
         self.board_surf = self.game_surf.subsurface((pos, pos, side, side))
-        self.circle_radius = self.board_surf.get_height() / self.board.cols / 2
+        if self.board is not None:
+            self.circle_radius = self.board_surf.get_height() / self.board.cols / 2
         # Calculate and update new sidebar size
         self.sidebar_surf = self.game_surf.subsurface((gh, 0, gw - gh, gh))
         # Calculate and update new font size
@@ -536,24 +628,30 @@ class Match3GUI:
 
     ### Main functions
 
-    def mainmenu_process_events(self, events, **kwargs) -> bool:
-        return False
-
-    def paused_process_events(self, events, **kwargs) -> bool:
+    def choosesize_process_events(self, events, **kwargs) -> bool:
+        # dds = getattr(self.active_buttons["choose_board_size"], '_Dropdown__choices') + [getattr(self.active_buttons["choose_board_size"], '_Dropdown__main')]
+        # colors = [dd.colour for dd in dds]
+        # self.active_buttons["choose_board_size"].listen(events)
+        # for i in range(len(dds)):
+        #     if colors[i] != dds[i].colour:
+        #         self.draw_choose()
+        #         self.active_buttons["choose_board_size"].draw()
+        #         return True
+        self.draw_choose()
+        # self.active_buttons["choose_board_size"].listen(events)
+        # self.active_buttons["choose_board_size"].draw()
+        return True
         return False
 
     def running_process_events(self, events, **kwargs) -> bool:
         # End the game if the time has run out
         if self.time_left <= 0:
-            print(f"Time's up. Final score: {self.score}")
-            pygame.quit()
-            exit()
-            self.game_state = GameState.MAINMENU #GameState.ENDED
+            self.game_ended = True
 
         update_display = False
 
         # Update the time left
-        self.time_left = self.time_init + self.time_score - (pygame.time.get_ticks() - self.time_start)
+        self.time_left = self.time_paused + self.time_init + self.time_score - (pygame.time.get_ticks() - self.time_start)
         if self.time_left_sec != int(round(self.time_left / 1000)):
             self.time_left_sec = int(round(self.time_left / 1000))
             if self.time_left_sec < 0:
@@ -658,11 +756,12 @@ class Match3GUI:
 
         # Listen to button events
         for button in self.active_buttons.values():
-            color = button.colour
-            button.listen(events)
-            if color != button.colour:
-                button.draw()
-                update_display = True
+            if type(button) == pygamew.Button:
+                color = button.colour
+                button.listen(events)
+                if color != button.colour:
+                    button.draw()
+                    update_display = True
 
         if update_display:
             pygame.display.flip()
@@ -714,7 +813,16 @@ class Match3GUI:
                 exit(1)
             self.update_board()
 
-        if self.hint:
+        if self.game_ended:
+            self.game_ended = False
+            self.game_state = GameState.ENDED
+            self.update_screen()
+        elif self.pause:
+            self.pause = False
+            self.game_state = GameState.PAUSED
+            self.update_screen()
+            self.pause_time = pygame.time.get_ticks()
+        elif self.hint:
             self.hint = False
             play = self.board.find_a_play()
             if len(play) > 0:
@@ -723,15 +831,14 @@ class Match3GUI:
             self.hint_cut_score = True
 
         # Let the computer play (for debug)
-        play = self.board.find_better_play()
-        if len(play) > 0:
-            (swap_points, groups) = play
-            print(f"Bot swapping {swap_points[0]} with {swap_points[1]}.")
-            self.animate_swap(swap_points[0], swap_points[1])
-            self.board.swap(swap_points[0], swap_points[1])
+        # play = self.board.find_better_play()
+        # if len(play) > 0:
+        #     (swap_points, groups) = play
+        #     print(f"Bot swapping {swap_points[0]} with {swap_points[1]}.")
+        #     self.animate_swap(swap_points[0], swap_points[1])
+        #     self.board.swap(swap_points[0], swap_points[1])
 
     def run(self) -> None:
-        self.board = Match3Board(self.side_len, self.side_len, self.side_len-1)
         pygame.init()
         self.font = pygame.font.SysFont("monospace", int(self.font_size))
         self.font.set_bold(True)
@@ -742,11 +849,6 @@ class Match3GUI:
 
         while True:
             if self.process_events(fps=self.main_loop_refresh_rate, mouse=True):
-                self.update_screen()
-
-            if self.pause:
-                self.pause = False
-                self.game_state = GameState.PAUSED
                 self.update_screen()
 
             if self.game_state == GameState.RUNNING:
