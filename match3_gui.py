@@ -3,8 +3,6 @@ import pygame
 import pygame_widgets as pygamew
 from pygame import gfxdraw
 from enum import Enum, auto
-
-from pygame_widgets.button import Button
 from match3_board import Match3Board
 
 
@@ -501,39 +499,6 @@ class Match3GUI:
         self.draw_screen()
         pygame.display.flip()
 
-    ### Helper functions
-
-    def win_pos_to_board_pos(self, win_pos_x: int, win_pos_y: int, relative_to_window: bool = False) -> tuple[int, int]:
-        if relative_to_window:
-            win_pos_x -= self.board_surf.get_abs_offset()[0]
-            win_pos_y -= self.board_surf.get_abs_offset()[1]
-        col_w = self.board_surf.get_width() / self.board.cols
-        row_h = self.board_surf.get_height() / self.board.rows
-        board_pos_x = (win_pos_x - col_w / 2) / col_w
-        board_pos_y = (win_pos_y - row_h / 2) / row_h
-        return (int(round(board_pos_x)), int(round(board_pos_y)))
-
-    def board_pos_to_win_pos(self, board_pos_x: int, board_pos_y: int, relative_to_window: bool = False) -> tuple[int, int]:
-        col_w = self.board_surf.get_width() / self.board.cols
-        row_h = self.board_surf.get_height() / self.board.rows
-        win_pos_x = board_pos_x * col_w + col_w / 2
-        win_pos_y = board_pos_y * row_h + row_h / 2
-        if relative_to_window:
-            win_pos_x += self.board_surf.get_abs_offset()[0]
-            win_pos_y += self.board_surf.get_abs_offset()[1]
-        return (int(win_pos_x), int(win_pos_y))
-
-    def point_inside_circle(self, point: tuple[int, int], circle_center: tuple[int, int], r: float) -> bool:
-        x, y = point
-        c_x, c_y = circle_center
-        return (x - c_x)**2 + (y - c_y)**2 < r**2
-
-    def get_num_vertical_points(self, points: list[tuple[int, int]]) -> int:
-        points_in_line = dict()
-        for (col, _) in points:
-            points_in_line[col] = points_in_line.get(col, 0) + 1
-        return max(points_in_line.values())
-
     # On click functions
 
     def new_game_clicked(self) -> None:
@@ -598,6 +563,39 @@ class Match3GUI:
         pygame.quit()
         exit()
 
+    ### Helper functions
+
+    def win_pos_to_board_pos(self, win_pos_x: int, win_pos_y: int, relative_to_window: bool = False) -> tuple[int, int]:
+        if relative_to_window:
+            win_pos_x -= self.board_surf.get_abs_offset()[0]
+            win_pos_y -= self.board_surf.get_abs_offset()[1]
+        col_w = self.board_surf.get_width() / self.board.cols
+        row_h = self.board_surf.get_height() / self.board.rows
+        board_pos_x = (win_pos_x - col_w / 2) / col_w
+        board_pos_y = (win_pos_y - row_h / 2) / row_h
+        return (int(round(board_pos_x)), int(round(board_pos_y)))
+
+    def board_pos_to_win_pos(self, board_pos_x: int, board_pos_y: int, relative_to_window: bool = False) -> tuple[int, int]:
+        col_w = self.board_surf.get_width() / self.board.cols
+        row_h = self.board_surf.get_height() / self.board.rows
+        win_pos_x = board_pos_x * col_w + col_w / 2
+        win_pos_y = board_pos_y * row_h + row_h / 2
+        if relative_to_window:
+            win_pos_x += self.board_surf.get_abs_offset()[0]
+            win_pos_y += self.board_surf.get_abs_offset()[1]
+        return (int(win_pos_x), int(win_pos_y))
+
+    def point_inside_circle(self, point: tuple[int, int], circle_center: tuple[int, int], r: float) -> bool:
+        x, y = point
+        c_x, c_y = circle_center
+        return (x - c_x)**2 + (y - c_y)**2 < r**2
+
+    def get_num_vertical_points(self, points: list[tuple[int, int]]) -> int:
+        points_in_line = dict()
+        for (col, _) in points:
+            points_in_line[col] = points_in_line.get(col, 0) + 1
+        return max(points_in_line.values())
+
     ### Other functions
 
     def resize_surfaces(self) -> None:
@@ -630,7 +628,7 @@ class Match3GUI:
         # Clear active widgets to force a re-draw
         self.active_widgets = {}
 
-    ### Main functions
+    ### Process events functions
 
     def choosesize_process_events(self, events, **kwargs) -> bool:
         self.active_widgets["choose_board_size"].listen(events)
@@ -765,6 +763,8 @@ class Match3GUI:
             pygame.display.flip()
 
         return False
+
+    ### Main game loop functions
 
     def running(self) -> None:
         # Let the computer play (for debug)
