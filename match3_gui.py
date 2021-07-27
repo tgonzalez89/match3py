@@ -85,7 +85,7 @@ class Match3GUI:
         self.time_score = 0
         self.time_left_sec = int(self.time_left / 1000)
         self.game_surf_pos = [0, 0]
-        self.active_buttons = {}
+        self.active_widgets = {}
         self.hint = False
         self.hint_cut_score = False
         self.plus_score_ani_time_start = 0
@@ -303,7 +303,6 @@ class Match3GUI:
     def draw_buttons(self, texts, y, separation, surface_name) -> None:
         surface = getattr(self, f"{surface_name}_surf")
         height = (self.char_height + self.char_sep_height) * 2
-        active_buttons = {}
         for text in texts:
             width = (len(text) + 4) * self.char_width
             x = (surface.get_width() - width) / 2 + surface.get_abs_offset()[0]
@@ -313,32 +312,26 @@ class Match3GUI:
                 border_thickness = 1
             button_name = text.lower()
             button_name = button_name.replace(' ', '_')
-            button = pygamew.Button(
-                self.screen_surf, x, y_abs, width, height,
-                text=text,
-                textColour=self.button_text_color,
-                font=self.font,
-                colour=(64, 64, 64),
-                hoverColour=(96, 96, 96),
-                pressedColour=(128, 128, 128),
-                borderColour=(0, 0, 0),
-                hoverBorderColour=(32, 32, 32),
-                pressedBorderColour=(64, 64, 64),
-                shadowColour=[val * 2 / 3 for val in self.background_color[surface_name]],
-                shadowDistance=self.char_sep_height // 2,
-                borderThickness=border_thickness,
-                onRelease=getattr(self, f"{button_name}_clicked")
-            )
+            if button_name not in self.active_widgets:
+                button = pygamew.Button(
+                    self.screen_surf, x, y_abs, width, height,
+                    text=text,
+                    textColour=self.button_text_color,
+                    font=self.font,
+                    colour=(64, 64, 64),
+                    hoverColour=(96, 96, 96),
+                    pressedColour=(128, 128, 128),
+                    borderColour=(0, 0, 0),
+                    hoverBorderColour=(32, 32, 32),
+                    pressedBorderColour=(64, 64, 64),
+                    shadowColour=[val * 2 / 3 for val in self.background_color[surface_name]],
+                    shadowDistance=self.char_sep_height // 2,
+                    borderThickness=border_thickness,
+                    onRelease=getattr(self, f"{button_name}_clicked")
+                )
+                self.active_widgets[button_name] = button
+            self.active_widgets[button_name].draw()
             y += (self.char_height + self.char_sep_height) * separation
-            if button_name in self.active_buttons:
-                button.clicked = self.active_buttons[button_name].clicked
-                if button.clicked:
-                    button.colour = self.active_buttons[button_name].pressedColour
-                    button.borderColour = self.active_buttons[button_name].pressedBorderColour
-            button.listen(None)
-            button.draw()
-            active_buttons[button_name] = button
-        self.active_buttons = active_buttons
 
     def draw_main_menu(self) -> None:
         self.screen_surf.fill(self.background_color["screen"])
@@ -429,10 +422,6 @@ class Match3GUI:
     def draw_choose(self) -> None:
         self.game_surf.fill(self.background_color["game"])
 
-        prev_dropdown = None
-        if "choose_board_size" in self.active_buttons:
-            prev_dropdown = self.active_buttons["choose_board_size"]
-
         y = self.game_surf.get_height() * 0.7
         texts = ("START",)
         self.draw_buttons(texts, y, 3, "game")
@@ -446,36 +435,27 @@ class Match3GUI:
         border_thickness = int(2 * self.game_surf.get_width() / self.starting_width)
         if border_thickness < 1:
             border_thickness = 1
-        button_name = text.lower()
-        button_name = button_name.replace(' ', '_')
-        dropdown = pygamew.Dropdown(
-            self.screen_surf, x, y_abs, width, height,
-            name=text,
-            textColour=self.button_text_color,
-            font=self.font,
-            inactiveColour=(64, 64, 64),
-            hoverColour=(96, 96, 96),
-            pressedColour=(128, 128, 128),
-            borderColour=(0, 0, 0),
-            hoverBorderColour=(32, 32, 32),
-            pressedBorderColour=(64, 64, 64),
-            borderThickness=border_thickness,
-            choices=[f"{n}x{n}" for n in range(5, 14)],
-            values=[n for n in range(5, 14)]
-        )
-        if prev_dropdown is not None:
-            if prev_dropdown.chosen is not None:
-                idx = getattr(prev_dropdown, '_Dropdown__choices').index(prev_dropdown.chosen)
-                dropdown.chosen = getattr(dropdown, '_Dropdown__choices')[idx]
-            dropdown.dropped = prev_dropdown.dropped
-            dds = getattr(dropdown, '_Dropdown__choices') + [getattr(dropdown, '_Dropdown__main')]
-            dds_prev = getattr(prev_dropdown, '_Dropdown__choices') + [getattr(prev_dropdown, '_Dropdown__main')]
-            for i in range(len(dds)):
-                dds[i].colour = dds_prev[i].colour
-        dropdown.listen(None)
-        dropdown.draw()
-
-        self.active_buttons["choose_board_size"] = dropdown
+        dropdown_name = text.lower()
+        dropdown_name = dropdown_name.replace(' ', '_')
+        if dropdown_name not in self.active_widgets:
+            dropdown = pygamew.Dropdown(
+                self.screen_surf, x, y_abs, width, height,
+                name=text,
+                textColour=self.button_text_color,
+                font=self.font,
+                inactiveColour=(64, 64, 64),
+                hoverColour=(96, 96, 96),
+                pressedColour=(128, 128, 128),
+                borderColour=(0, 0, 0),
+                hoverBorderColour=(32, 32, 32),
+                pressedBorderColour=(64, 64, 64),
+                borderThickness=border_thickness,
+                choices=[f"{n}x{n}" for n in range(5, 14)],
+                values=[n for n in range(5, 14)]
+            )
+            self.active_widgets[dropdown_name] = dropdown
+        # FIXME: When window is resized dropdown is regenerated and loses its current selection.
+        self.active_widgets[dropdown_name].draw()
 
     def draw_screen(self) -> None:
         self.screen_surf.fill(self.background_color["screen"])
@@ -501,6 +481,7 @@ class Match3GUI:
         pygame.display.flip()
 
     def update_screen(self) -> None:
+        self.active_widgets = {}
         self.draw_screen()
         pygame.display.flip()
 
@@ -544,7 +525,7 @@ class Match3GUI:
         self.update_screen()
 
     def start_clicked(self) -> None:
-        size = self.active_buttons["choose_board_size"].getSelected()
+        size = self.active_widgets["choose_board_size"].getSelected()
         if size is None:
             return
         self.board = Match3Board(size, size, size-1)
@@ -629,19 +610,13 @@ class Match3GUI:
     ### Main functions
 
     def choosesize_process_events(self, events, **kwargs) -> bool:
-        # dds = getattr(self.active_buttons["choose_board_size"], '_Dropdown__choices') + [getattr(self.active_buttons["choose_board_size"], '_Dropdown__main')]
-        # colors = [dd.colour for dd in dds]
-        # self.active_buttons["choose_board_size"].listen(events)
-        # for i in range(len(dds)):
-        #     if colors[i] != dds[i].colour:
-        #         self.draw_choose()
-        #         self.active_buttons["choose_board_size"].draw()
-        #         return True
+        self.active_widgets["choose_board_size"].listen(events)
         self.draw_choose()
-        # self.active_buttons["choose_board_size"].listen(events)
-        # self.active_buttons["choose_board_size"].draw()
+        if self.active_widgets["choose_board_size"].dropped:
+            self.active_widgets["start"]._hidden = True
+        else:
+            self.active_widgets["start"]._hidden = False
         return True
-        return False
 
     def running_process_events(self, events, **kwargs) -> bool:
         # End the game if the time has run out
@@ -755,7 +730,7 @@ class Match3GUI:
             update_display = func(events, **kwargs)
 
         # Listen to button events
-        for button in self.active_buttons.values():
+        for button in self.active_widgets.values():
             if type(button) == pygamew.Button:
                 color = button.colour
                 button.listen(events)
