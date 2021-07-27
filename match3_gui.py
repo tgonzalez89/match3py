@@ -67,7 +67,7 @@ class Match3GUI:
     min_char_height = 13.8
     min_char_sep_height = min_char_height / 2
     button_text_color = (255, 255, 255)
-    time_init = 60000
+    time_init = 600
 
     def __init__(self) -> None:
         self.board = None
@@ -102,6 +102,7 @@ class Match3GUI:
         self.pause_time = 0
         self.time_paused = 0
         self.game_ended = False
+        self.prev_state = None
 
     ### Animate functions
 
@@ -412,11 +413,25 @@ class Match3GUI:
             x = (self.game_surf.get_width() - width) / 2
             label = self.font.render(text, True, self.button_text_color)
             self.game_surf.blit(label, (x, y))
-            y += self.char_height + self.char_sep_height
+            y += (self.char_height + self.char_sep_height) * 1.5
 
         y += (self.char_height + self.char_sep_height) * 2
 
         texts = ("CONTINUE",)
+        self.draw_buttons(texts, y, 3, "game")
+
+    def draw_about(self) -> None:
+        self.game_surf.fill(self.background_color["game"])
+
+        y = self.game_surf.get_height() * 0.3
+        for text in ("MATCH3PY", "AUTHOR: TOMAS GONZALEZ ARAGON"):
+            width = len(text) * self.char_width
+            x = (self.game_surf.get_width() - width) / 2
+            label = self.font.render(text, True, self.button_text_color)
+            self.game_surf.blit(label, (x, y))
+            y += (self.char_height + self.char_sep_height) * 4
+
+        texts = ("BACK",)
         self.draw_buttons(texts, y, 3, "game")
 
     def draw_choose(self) -> None:
@@ -468,6 +483,8 @@ class Match3GUI:
             self.draw_ended()
         elif self.game_state == GameState.CHOOSESIZE:
             self.draw_choose()
+        elif self.game_state == GameState.ABOUT:
+            self.draw_about()
 
     ### Update functions
 
@@ -554,8 +571,13 @@ class Match3GUI:
         #self.update_screen()
 
     def about_clicked(self) -> None:
-        print(f"About Clicked")
-        #self.update_screen()
+        self.prev_state = self.game_state
+        self.game_state = GameState.ABOUT
+        self.update_screen()
+
+    def back_clicked(self) -> None:
+        self.game_state = self.prev_state
+        self.update_screen()
 
     def pause_clicked(self) -> None:
         self.pause = True
