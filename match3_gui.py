@@ -334,10 +334,10 @@ class Match3GUI:
             y += (self.char_height + self.char_sep_height) * separation
 
     def draw_main_menu(self) -> None:
-        self.screen_surf.fill(self.background_color["screen"])
         self.game_surf.fill(self.background_color["game"])
 
-        texts = ["NEW GAME", "HIGH SCORES", "PREFERENCES", "ABOUT", "EXIT"]
+        #texts = ["NEW GAME", "HIGH SCORES", "PREFERENCES", "ABOUT", "EXIT"]
+        texts = ["NEW GAME", "ABOUT", "EXIT"]
         if self.game_state == GameState.PAUSED:
             texts = ["RESUME GAME"] + texts
         y = (self.game_surf.get_height() - (len(texts) * (self.char_height + self.char_sep_height) * 3.5 - (self.char_height + self.char_sep_height) * 2)) / 2
@@ -459,7 +459,6 @@ class Match3GUI:
 
     def draw_screen(self) -> None:
         self.screen_surf.fill(self.background_color["screen"])
-        self.game_surf.fill(self.background_color["game"])
         if self.game_state == GameState.MAINMENU or self.game_state == GameState.PAUSED:
             self.draw_main_menu()
         elif self.game_state == GameState.RUNNING:
@@ -606,6 +605,8 @@ class Match3GUI:
         self.char_sep_height = self.min_char_sep_height * self.game_surf.get_height() / self.starting_height
         self.font = pygame.font.SysFont("monospace", int(self.font_size))
         self.font.set_bold(True)
+        # Clear active widgets to force a re-draw
+        self.active_widgets = {}
 
     ### Main functions
 
@@ -744,6 +745,14 @@ class Match3GUI:
         return False
 
     def running(self) -> None:
+        # Let the computer play (for debug)
+        # play = self.board.find_better_play()
+        # if len(play) > 0:
+        #     (swap_points, groups) = play
+        #     print(f"Bot swapping {swap_points[0]} with {swap_points[1]}.")
+        #     self.animate_swap(swap_points[0], swap_points[1])
+        #     self.board.swap(swap_points[0], swap_points[1])
+
         # Find all the match3 groups and update the board state by
         # clearing them and then filling the board with new tiles from the top
         # while shifting down the ones floating
@@ -788,6 +797,13 @@ class Match3GUI:
                 exit(1)
             self.update_board()
 
+        if self.hint:
+            self.hint = False
+            play = self.board.find_a_play()
+            if len(play) > 0:
+                (swap_points, groups) = play
+                self.animate_hint(*swap_points)
+            self.hint_cut_score = True
         if self.game_ended:
             self.game_ended = False
             self.game_state = GameState.ENDED
@@ -797,21 +813,7 @@ class Match3GUI:
             self.game_state = GameState.PAUSED
             self.update_screen()
             self.pause_time = pygame.time.get_ticks()
-        elif self.hint:
-            self.hint = False
-            play = self.board.find_a_play()
-            if len(play) > 0:
-                (swap_points, groups) = play
-                self.animate_hint(*swap_points)
-            self.hint_cut_score = True
 
-        # Let the computer play (for debug)
-        # play = self.board.find_better_play()
-        # if len(play) > 0:
-        #     (swap_points, groups) = play
-        #     print(f"Bot swapping {swap_points[0]} with {swap_points[1]}.")
-        #     self.animate_swap(swap_points[0], swap_points[1])
-        #     self.board.swap(swap_points[0], swap_points[1])
 
     def run(self) -> None:
         pygame.init()
