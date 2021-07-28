@@ -1,3 +1,5 @@
+import json
+import jsonschema
 import math
 import pygame
 import pygame_widgets as pygamew
@@ -66,6 +68,28 @@ class Match3GUI:
     min_char_sep_height = min_char_height / 2
     button_text_color = (255, 255, 255)
     time_init = 60000
+    board_sizes = list(range(5, 14))
+    high_scores_filename = "high_scores.json"
+    high_scores_schema = '''
+    {
+        "type": "object",
+        "additionalProperties": {
+            "type": "array",
+            "items": {
+                "type": "array",
+                "items": [
+                    {"type": "string", "maxLength": 10},
+                    {"type": "integer", "minimum": 1}
+                ],
+                "additionalProperties": false
+            },
+            "maxItems": 10
+        },
+        "propertyNames": {"enum": []}
+    }
+    '''
+    high_scores_schema = json.loads(high_scores_schema)
+    high_scores_schema["propertyNames"]["enum"] = [f"{n}x{n}" for n in board_sizes]
 
     def __init__(self) -> None:
         self.board = None
@@ -463,8 +487,8 @@ class Match3GUI:
                 hoverBorderColour=(32, 32, 32),
                 pressedBorderColour=(64, 64, 64),
                 borderThickness=border_thickness,
-                choices=[f"{n}x{n}" for n in range(5, 14)],
-                values=[n for n in range(5, 14)]
+                choices=[f"{n}x{n}" for n in self.board_sizes],
+                values=self.board_sizes
             )
             self.active_widgets[dropdown_name] = dropdown
         # FIXME: When window is resized dropdown is regenerated and loses its current selection.
@@ -556,6 +580,30 @@ class Match3GUI:
         self.hint = True
 
     def continue_clicked(self) -> None:
+        min_hs = 0
+        hs = list()
+        if f"{self.board.cols}x{self.board.rows}" in self.high_scores:
+            hs = self.high_scores[f"{self.board.cols}x{self.board.rows}"]
+        if len(hs) > 0:
+            min_hs = min([ns[1] for ns in hs])
+        if self.score > min_hs: 
+            self.game_state = GameState.ENTERHIGHSCORE
+        else:
+            self.game_state = GameState.MAINMENU
+        self.update_screen()
+
+    def ok_clicked(self) -> None:
+        name = self.active_widgets["high_score_name"].getText()
+        # TODO: Sanitize name (length, valid characters). Maybe this is done here, maybe it is done as the text is being introduced.
+        hs = list()
+        if f"{self.board.cols}x{self.board.rows}" in self.high_scores:
+            hs = self.high_scores[f"{self.board.cols}x{self.board.rows}"]
+        hs.append({"name": name, "score": self.score})
+        hs.sort(key=lambda d: d["score"], reverse=True)
+        if len(hs) > 10:
+            del hs[-1]
+        with open(self.high_scores_filename, 'w') as f:
+            json.dump(self.high_scores, f)
         self.game_state = GameState.MAINMENU
         self.update_screen()
 
@@ -838,6 +886,17 @@ class Match3GUI:
 
 
     def run(self) -> None:
+        # Read high scores file
+        try:
+            with open(self.high_scores_filename, 'r') as json_file:
+                self.high_scores = json.load(json_file)
+                try:
+                    jsonschema.validate(self.high_scores, self.high_scores_schema)
+                except jsonschema.ValidationError:
+                    self.high_scores = dict()
+        except FileNotFoundError:
+            self.high_scores = dict()
+
         pygame.init()
         self.font = pygame.font.SysFont("monospace", int(self.font_size))
         self.font.set_bold(True)
