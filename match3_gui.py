@@ -67,7 +67,7 @@ class Match3GUI:
     min_char_height = 13.8
     min_char_sep_height = min_char_height / 2
     button_text_color = (255, 255, 255)
-    time_init = 60000
+    time_init = 6000
     board_sizes = list(range(5, 14))
     high_scores_filename = "high_scores.json"
     high_scores_schema = '''
@@ -78,7 +78,7 @@ class Match3GUI:
             "items": {
                 "type": "array",
                 "items": [
-                    {"type": "string", "maxLength": 10},
+                    {"type": "string", "maxLength": 15},
                     {"type": "integer", "minimum": 1}
                 ],
                 "additionalProperties": false
@@ -494,6 +494,53 @@ class Match3GUI:
         # FIXME: When window is resized dropdown is regenerated and loses its current selection.
         self.active_widgets[dropdown_name].draw()
 
+    def draw_enterhighscore(self ) -> None:
+        self.game_surf.fill(self.background_color["game"])
+
+        y = self.game_surf.get_height() * 0.2
+        text = "HIGH SCORE ACHIEVED!"
+        width = len(text) * self.char_width
+        x = (self.game_surf.get_width() - width) / 2
+        label = self.font.render(text, True, self.button_text_color)
+        self.game_surf.blit(label, (x, y))
+
+        y += (self.char_height + self.char_sep_height) * 4
+
+        text = "Enter your name:"
+        width = len(text) * self.char_width
+        x = (self.game_surf.get_width() - width) / 2
+        label = self.font.render(text, True, self.button_text_color)
+        self.game_surf.blit(label, (x, y))
+
+        y += (self.char_height + self.char_sep_height) * 2
+
+        width = 16 * self.char_width
+        height = (self.char_height + self.char_sep_height) * 2
+        x = (self.game_surf.get_width() - width) / 2 + self.game_surf.get_abs_offset()[0]
+        y_abs = y + self.game_surf.get_abs_offset()[1]
+        border_thickness = int(2 * self.game_surf.get_width() / self.starting_width)
+        if border_thickness < 1:
+            border_thickness = 1
+        textbox_name = "high_score_name"
+        if textbox_name not in self.active_widgets:
+            textbox = pygamew.TextBox(
+                self.screen_surf, x, y_abs, width, height,
+                textColour=self.button_text_color,
+                font=self.font,
+                colour=(64, 64, 64),
+                borderColour=(0, 0, 0),
+                borderThickness=border_thickness,
+                placeholderText="Enter your name",
+                onSubmit=self.ok_clicked
+            )
+            self.active_widgets[textbox_name] = textbox
+        self.active_widgets[textbox_name].draw()
+
+        y += (self.char_height + self.char_sep_height) * 4
+
+        texts = ("OK",)
+        self.draw_buttons(texts, y, 3, "game")
+
     def draw_screen(self) -> None:
         self.screen_surf.fill(self.background_color["screen"])
         if self.game_state == GameState.MAINMENU or self.game_state == GameState.PAUSED:
@@ -507,6 +554,8 @@ class Match3GUI:
             self.draw_choose()
         elif self.game_state == GameState.ABOUT:
             self.draw_about()
+        elif self.game_state == GameState.ENTERHIGHSCORE:
+            self.draw_enterhighscore()
 
     ### Update functions
 
@@ -523,7 +572,7 @@ class Match3GUI:
         self.draw_screen()
         pygame.display.flip()
 
-    # On click functions
+    ### On click functions
 
     def new_game_clicked(self) -> None:
         self.game_state = GameState.CHOOSESIZE
@@ -581,12 +630,10 @@ class Match3GUI:
 
     def continue_clicked(self) -> None:
         min_hs = 0
-        hs = list()
-        if f"{self.board.cols}x{self.board.rows}" in self.high_scores:
-            hs = self.high_scores[f"{self.board.cols}x{self.board.rows}"]
+        hs = self.high_scores.get(f"{self.board.cols}x{self.board.rows}", list())
         if len(hs) > 0:
             min_hs = min([ns[1] for ns in hs])
-        if self.score > min_hs: 
+        if self.score > min_hs or len(hs) < 10:
             self.game_state = GameState.ENTERHIGHSCORE
         else:
             self.game_state = GameState.MAINMENU
@@ -594,14 +641,15 @@ class Match3GUI:
 
     def ok_clicked(self) -> None:
         name = self.active_widgets["high_score_name"].getText()
+        if len(name) == 0:
+            return
         # TODO: Sanitize name (length, valid characters). Maybe this is done here, maybe it is done as the text is being introduced.
-        hs = list()
-        if f"{self.board.cols}x{self.board.rows}" in self.high_scores:
-            hs = self.high_scores[f"{self.board.cols}x{self.board.rows}"]
-        hs.append({"name": name, "score": self.score})
-        hs.sort(key=lambda d: d["score"], reverse=True)
+        hs = self.high_scores.get(f"{self.board.cols}x{self.board.rows}", list())
+        hs.append([name, self.score])
+        hs.sort(key=lambda d: d[1], reverse=True)
         if len(hs) > 10:
             del hs[-1]
+        self.high_scores[f"{self.board.cols}x{self.board.rows}"] = hs
         with open(self.high_scores_filename, 'w') as f:
             json.dump(self.high_scores, f)
         self.game_state = GameState.MAINMENU
@@ -678,13 +726,18 @@ class Match3GUI:
 
     ### Process events functions
 
+    def enterhighscore_process_events(self, events, **kwargs) -> bool:
+        self.active_widgets["high_score_name"].listen(events)
+        self.draw_screen()
+        return True
+
     def choosesize_process_events(self, events, **kwargs) -> bool:
         self.active_widgets["choose_board_size"].listen(events)
         self.draw_choose()
         if self.active_widgets["choose_board_size"].dropped:
-            self.active_widgets["start"]._hidden = True
+            self.active_widgets["start"].hide()
         else:
-            self.active_widgets["start"]._hidden = False
+            self.active_widgets["start"].show()
         return True
 
     def running_process_events(self, events, **kwargs) -> bool:
@@ -893,6 +946,7 @@ class Match3GUI:
                 try:
                     jsonschema.validate(self.high_scores, self.high_scores_schema)
                 except jsonschema.ValidationError:
+                    print("ERROR: Invalid json schema for high scores file.")
                     self.high_scores = dict()
         except FileNotFoundError:
             self.high_scores = dict()
