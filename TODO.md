@@ -1,4 +1,5 @@
-## ToDo List
+# ToDo List
+
 * [ ] High scores
   * [ ] If the user achieves a high score, show a screen after the game has ended so that they can enter their name
   * [ ] Save high scores in a file (json)
@@ -13,4 +14,5 @@
     * Match
     * Shift down (maybe)
     * Timer about to run out
-  * [ ] Preferences button in the main menu to turn on/off musing and sound effects
+  * [ ] Preferences button in the main menu to turn on/off background music and sound effects
+    * Save preferences to a file (json)
