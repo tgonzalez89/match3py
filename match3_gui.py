@@ -65,7 +65,7 @@ class Match3GUI:
     min_char_height = 13.8
     min_char_sep_height = min_char_height / 2
     button_text_color = (255, 255, 255)
-    time_init = 600
+    time_init = 60000
 
     def __init__(self) -> None:
         self.board = None
