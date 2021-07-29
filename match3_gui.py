@@ -49,7 +49,7 @@ class Match3GUI:
         "sidebar": (48, 48, 48),
     }
     hint_color = (255, 255, 255)
-    button_text_color = (255, 255, 255)
+    widget_text_color = (255, 255, 255)
     starting_width = 640
     starting_height = 480
     game_ratio = starting_width / starting_height
@@ -68,8 +68,9 @@ class Match3GUI:
     min_char_width = 13.8
     min_char_height = 13.8
     min_char_sep_height = min_char_height / 2
-    time_init = 6000
+    time_init = 60000
     board_sizes = list(range(5, 14))
+    high_score_name_max_len = 20
     high_scores_filename = "high_scores.json"
     high_scores_schema = '''
     {
@@ -79,12 +80,12 @@ class Match3GUI:
             "items": {
                 "type": "array",
                 "items": [
-                    {"type": "string", "maxLength": 25},
+                    {"type": "string", "maxLength": 20},
                     {"type": "integer", "minimum": 1}
                 ],
                 "additionalProperties": false
             },
-            "maxItems": 10
+            "maxItems": 5
         },
         "propertyNames": {"enum": []}
     }
@@ -125,6 +126,7 @@ class Match3GUI:
         self.time_paused = 0
         self.game_ended = False
         self.prev_state = None
+        self.high_scores_state = 5
 
     ##################################################
     # Animate functions
@@ -368,7 +370,7 @@ class Match3GUI:
                 button = pygamew.Button(
                     self.screen_surf, x, y_abs, width, height,
                     text=text,
-                    textColour=self.button_text_color,
+                    textColour=self.widget_text_color,
                     font=self.font,
                     colour=(64, 64, 64),
                     hoverColour=(96, 96, 96),
@@ -393,7 +395,7 @@ class Match3GUI:
             if i == 2:
                 y += self.char_height + self.char_sep_height
             if i == 3:
-                tc = list(self.button_text_color)
+                tc = list(self.widget_text_color)
                 gb = 255 * self.time_left_sec / (self.time_init / 1000)
                 if gb > 255:
                     gb = 255
@@ -403,7 +405,7 @@ class Match3GUI:
                 tc[2] = gb
                 label = self.font.render(text, True, tc)
             else:
-                label = self.font.render(text, True, self.button_text_color)
+                label = self.font.render(text, True, self.widget_text_color)
             width = len(text) * self.char_width
             x = (self.sidebar_surf.get_width() - width) / 2
             self.sidebar_surf.blit(label, (x, y))
@@ -451,7 +453,7 @@ class Match3GUI:
             dropdown = pygamew.Dropdown(
                 self.screen_surf, x, y_abs, width, height,
                 name=text,
-                textColour=self.button_text_color,
+                textColour=self.widget_text_color,
                 font=self.font,
                 inactiveColour=(64, 64, 64),
                 hoverColour=(96, 96, 96),
@@ -474,7 +476,7 @@ class Match3GUI:
         for i, text in enumerate(("TIME'S UP!", "YOUR SCORE:", str(self.score))):
             width = len(text) * self.char_width
             x = (self.game_surf.get_width() - width) / 2
-            label = self.font.render(text, True, self.button_text_color)
+            label = self.font.render(text, True, self.widget_text_color)
             self.game_surf.blit(label, (x, y))
             y += (self.char_height + self.char_sep_height)
             if i == 0:
@@ -492,7 +494,7 @@ class Match3GUI:
         text = "HIGH SCORE ACHIEVED!"
         width = len(text) * self.char_width
         x = (self.game_surf.get_width() - width) / 2
-        label = self.font.render(text, True, self.button_text_color)
+        label = self.font.render(text, True, self.widget_text_color)
         self.game_surf.blit(label, (x, y))
 
         y += (self.char_height + self.char_sep_height) * 3
@@ -500,12 +502,12 @@ class Match3GUI:
         text = "Enter your name:"
         width = len(text) * self.char_width
         x = (self.game_surf.get_width() - width) / 2
-        label = self.font.render(text, True, self.button_text_color)
+        label = self.font.render(text, True, self.widget_text_color)
         self.game_surf.blit(label, (x, y))
 
         y += (self.char_height + self.char_sep_height) * 2
 
-        width = 26 * self.char_width
+        width = (self.high_score_name_max_len + 1) * self.char_width
         height = (self.char_height + self.char_sep_height) * 2
         x = (self.game_surf.get_width() - width) / 2 + self.game_surf.get_abs_offset()[0]
         y_abs = y + self.game_surf.get_abs_offset()[1]
@@ -516,7 +518,7 @@ class Match3GUI:
         if textbox_name not in self.active_widgets:
             textbox = pygamew.TextBox(
                 self.screen_surf, x, y_abs, width, height,
-                textColour=self.button_text_color,
+                textColour=self.widget_text_color,
                 font=self.font,
                 colour=(64, 64, 64),
                 borderColour=(0, 0, 0),
@@ -533,9 +535,69 @@ class Match3GUI:
         self.draw_buttons(texts, y, 0, "game")
 
     def draw_highscores(self) -> None:
-        pass
+        self.game_surf.fill(self.background_color["game"])
+
+        hsss = f"{self.high_scores_state}x{self.high_scores_state}"
+
+        y = (self.game_surf.get_height() - (self.char_height + self.char_sep_height) * 15) / 2
+        for text in ("HIGH SCORES", hsss, f"Rank Name{' '*(self.high_score_name_max_len-4)} Score"):
+            width = len(text) * self.char_width
+            x = (self.game_surf.get_width() - width) / 2
+            label = self.font.render(text, True, self.widget_text_color)
+            self.game_surf.blit(label, (x, y))
+            y += (self.char_height + self.char_sep_height) * 2
+
+        for i in range(5):
+            if hsss in self.high_scores and i < len(self.high_scores[hsss]):
+                cols = (
+                    f"{i+1:>4}",
+                    f"{self.high_scores[hsss][i][0]}{' '*(self.high_score_name_max_len-len(self.high_scores[hsss][i][0]))}",
+                    f"{self.high_scores[hsss][i][1]:>5}"
+                )
+                text = f"{cols[0]} {cols[1]} {cols[2]}"
+                width = len(text) * self.char_width
+                x = (self.game_surf.get_width() - width) / 2
+                label = self.font.render(text, True, self.widget_text_color)
+                self.game_surf.blit(label, (x, y))
+            y += (self.char_height + self.char_sep_height)
+
+        y += (self.char_height + self.char_sep_height) * 2
+
+        texts = ("BACK",)
+        self.draw_buttons(texts, y, 0, "game")
+
+        for i, text in enumerate(("<", ">")):
+            width = (len(text) + 2) * self.char_width
+            height = (self.char_height + self.char_sep_height) * 5
+            x = {0: self.char_width, 1: self.game_surf.get_width() - width - self.char_width}.get(i)
+            y = (self.game_surf.get_height() - height) / 2 + self.game_surf.get_abs_offset()[1]
+            y_abs = y + self.game_surf.get_abs_offset()[1]
+            border_thickness = int(2 * self.game_surf.get_width() / self.starting_width)
+            if border_thickness < 1:
+                border_thickness = 1
+            button_name = {0: "left", 1: "right"}.get(i)
+            if button_name not in self.active_widgets:
+                button = pygamew.Button(
+                    self.screen_surf, x, y_abs, width, height,
+                    text=text,
+                    textColour=self.widget_text_color,
+                    font=self.font,
+                    colour=(64, 64, 64),
+                    hoverColour=(96, 96, 96),
+                    pressedColour=(128, 128, 128),
+                    borderColour=(0, 0, 0),
+                    hoverBorderColour=(32, 32, 32),
+                    pressedBorderColour=(64, 64, 64),
+                    shadowColour=[val * 2 / 3 for val in self.background_color["game"]],
+                    shadowDistance=self.char_sep_height // 2,
+                    borderThickness=border_thickness,
+                    onRelease=getattr(self, f"{button_name}_clicked")
+                )
+                self.active_widgets[button_name] = button
+            self.active_widgets[button_name].draw()
 
     def draw_preferences(self) -> None:
+        # TODO: Implement preferences
         pass
 
     def draw_about(self) -> None:
@@ -545,7 +607,7 @@ class Match3GUI:
         for text in ("MATCH3PY", "AUTHOR: TOMAS GONZALEZ ARAGON"):
             width = len(text) * self.char_width
             x = (self.game_surf.get_width() - width) / 2
-            label = self.font.render(text, True, self.button_text_color)
+            label = self.font.render(text, True, self.widget_text_color)
             self.game_surf.blit(label, (x, y))
             y += (self.char_height + self.char_sep_height) * 4
 
@@ -650,7 +712,7 @@ class Match3GUI:
         hs = self.high_scores.get(f"{self.board.cols}x{self.board.rows}", list())
         hs.append([name, self.score])
         hs.sort(key=lambda d: d[1], reverse=True)
-        if len(hs) > 10:
+        if len(hs) > 5:
             del hs[-1]
         self.high_scores[f"{self.board.cols}x{self.board.rows}"] = hs
         with open(self.high_scores_filename, 'w') as f:
@@ -659,17 +721,27 @@ class Match3GUI:
         self.update_screen()
 
     def high_scores_clicked(self) -> None:
-        print(f"High Scores Clicked")
-        # TODO: Implement show high scores
-        # self.prev_state = self.game_state
-        # self.game_state = GameState.HIGHSCORES
-        # self.update_screen()
+        self.prev_state = self.game_state
+        self.game_state = GameState.HIGHSCORES
+        self.update_screen()
+
+    def left_clicked(self) -> None:
+        self.high_scores_state -= 1
+        if self.high_scores_state < self.board_sizes[0]:
+            self.high_scores_state = self.board_sizes[0]
+        self.update_screen()
+
+    def right_clicked(self) -> None:
+        self.high_scores_state += 1
+        if self.high_scores_state > self.board_sizes[-1]:
+            self.high_scores_state = self.board_sizes[-1]
+        self.update_screen()
 
     def preferences_clicked(self) -> None:
         print(f"Preferences Clicked")
         # TODO: Implement preferences
         # self.prev_state = self.game_state
-        # self.game_state = GameState.HIGHSCORES
+        # self.game_state = GameState.PREFERENCES
         # self.update_screen()
 
     def save_clicked(self) -> None:
@@ -912,7 +984,6 @@ class Match3GUI:
         # play = self.board.find_better_play()
         # if len(play) > 0:
         #     (swap_points, groups) = play
-        #     print(f"Bot swapping {swap_points[0]} with {swap_points[1]}.")
         #     self.animate_swap(swap_points[0], swap_points[1])
         #     self.board.swap(swap_points[0], swap_points[1])
 
