@@ -49,25 +49,26 @@ class Match3GUI:
         "sidebar": (48, 48, 48),
     }
     hint_color = (255, 255, 255)
+    button_text_color = (255, 255, 255)
     starting_width = 640
     starting_height = 480
     game_ratio = starting_width / starting_height
     board_scale = 9 / 10
+    circle_scale = 18 / 20
     plus_score_ani_time = 500
     hint_ani_time = 500
     swap_ani_time = 200
     shift_down_ani_time = 200
     clear_ani_time = 200
+    plus_score_blink_ani_time = 100
     ani_fps = 60
     main_loop_refresh_rate = 30
-    circle_scale = 18 / 20
     flags = pygame.RESIZABLE | pygame.HWSURFACE
     min_font_size = 20
     min_char_width = 13.8
     min_char_height = 13.8
     min_char_sep_height = min_char_height / 2
-    button_text_color = (255, 255, 255)
-    time_init = 6000
+    time_init = 60000
     board_sizes = list(range(5, 14))
     high_scores_filename = "high_scores.json"
     high_scores_schema = '''
@@ -78,7 +79,7 @@ class Match3GUI:
             "items": {
                 "type": "array",
                 "items": [
-                    {"type": "string", "maxLength": 15},
+                    {"type": "string", "maxLength": 25},
                     {"type": "integer", "minimum": 1}
                 ],
                 "additionalProperties": false
@@ -93,12 +94,12 @@ class Match3GUI:
 
     def __init__(self) -> None:
         self.board = None
-        self.circle_radius = 0
         self.screen_surf = None
         self.game_surf = None
         self.board_surf = None
         self.sidebar_surf = None
         self.clock = None
+        self.circle_radius = 0
         self.mouse_state = MouseState.WAITING
         self.board_pos_src = None
         self.score = 0
@@ -106,7 +107,6 @@ class Match3GUI:
         self.time_start = 0
         self.time_score = 0
         self.time_left_sec = int(self.time_left / 1000)
-        self.game_surf_pos = [0, 0]
         self.active_widgets = {}
         self.hint = False
         self.hint_cut_score = False
@@ -126,46 +126,9 @@ class Match3GUI:
         self.game_ended = False
         self.prev_state = None
 
-    ### Animate functions
-
-    def animate_plus_score_prev(self) -> None:
-        self.curr_plus_score_ani_time = self.plus_score_ani_time + 1
-        self.update_sidebar()
-        pygame.time.wait(100)
-
-    def animate_plus_score_post(self) -> None:
-        self.curr_plus_score_ani_time = 0
-        self.plus_score_ani_time_start = pygame.time.get_ticks()
-        self.update_sidebar()
-
-    def animate_hint(self, board_point1: tuple[int, int], board_point2: tuple[int, int]) -> None:
-        board_points = (board_point1, board_point2)
-        win_points = (list(self.board_pos_to_win_pos(*board_points[0])), list(self.board_pos_to_win_pos(*board_points[1])))
-
-        curr_ani_time = 0
-        ani_time_start = pygame.time.get_ticks()
-
-        while curr_ani_time <= self.hint_ani_time:
-            if self.process_events():
-                self.screen_surf.fill(self.background_color["screen"])
-                self.game_surf.fill(self.background_color["game"])
-                self.draw_sidebar()
-                win_points = (list(self.board_pos_to_win_pos(*board_points[0])), list(self.board_pos_to_win_pos(*board_points[1])))
-
-            self.draw_board(no_draw_pts=board_points)
-
-            curr_ani_time = pygame.time.get_ticks() - ani_time_start
-
-            for p_i in range(2):
-                color_index = self.board.board[board_points[p_i][1]][board_points[p_i][0]]
-                if color_index < 0:
-                    continue
-                self.draw_circle(*win_points[p_i], self.hint_color, self.circle_radius / self.circle_scale)
-                self.draw_circle(*win_points[p_i], self.colors[color_index])
-
-            pygame.display.flip()
-
-        self.update_board()
+    ##################################################
+    # Animate functions
+    ##################################################
 
     def animate_swap(self, board_point1: tuple[int, int], board_point2: tuple[int, int]) -> None:
         board_points = (board_point1, board_point2)
@@ -321,9 +284,75 @@ class Match3GUI:
 
             pygame.display.flip()
 
-    ### Draw functions
+    def animate_hint(self, board_point1: tuple[int, int], board_point2: tuple[int, int]) -> None:
+        board_points = (board_point1, board_point2)
+        win_points = (list(self.board_pos_to_win_pos(*board_points[0])), list(self.board_pos_to_win_pos(*board_points[1])))
 
-    def draw_buttons(self, texts, y, separation, surface_name) -> None:
+        curr_ani_time = 0
+        ani_time_start = pygame.time.get_ticks()
+
+        while curr_ani_time <= self.hint_ani_time:
+            if self.process_events():
+                self.screen_surf.fill(self.background_color["screen"])
+                self.game_surf.fill(self.background_color["game"])
+                self.draw_sidebar()
+                win_points = (list(self.board_pos_to_win_pos(*board_points[0])), list(self.board_pos_to_win_pos(*board_points[1])))
+
+            self.draw_board(no_draw_pts=board_points)
+
+            curr_ani_time = pygame.time.get_ticks() - ani_time_start
+
+            for p_i in range(2):
+                color_index = self.board.board[board_points[p_i][1]][board_points[p_i][0]]
+                if color_index < 0:
+                    continue
+                self.draw_circle(*win_points[p_i], self.hint_color, self.circle_radius / self.circle_scale)
+                self.draw_circle(*win_points[p_i], self.colors[color_index])
+
+            pygame.display.flip()
+
+        self.update_board()
+
+    def animate_plus_score_prev(self) -> None:
+        self.curr_plus_score_ani_time = self.plus_score_ani_time + 1
+        self.update_sidebar()
+        pygame.time.wait(self.plus_score_blink_ani_time)
+
+    def animate_plus_score_post(self) -> None:
+        self.curr_plus_score_ani_time = 0
+        self.plus_score_ani_time_start = pygame.time.get_ticks()
+        self.update_sidebar()
+
+    ##################################################
+    # Draw functions
+    ##################################################
+
+    def draw_circle(self, x, y, color, radius = None) -> None:
+        if radius is None:
+            radius = self.circle_radius
+        if color != (0, 0, 0):
+            gfxdraw.aacircle(self.board_surf, x, y, int(radius * self.circle_scale), color)
+            gfxdraw.filled_circle(self.board_surf, x, y, int(radius * self.circle_scale), color)
+        else:
+            gfxdraw.aacircle(self.board_surf, x, y, int(radius * self.circle_scale), self.border_color)
+            gfxdraw.filled_circle(self.board_surf, x, y, int(radius * self.circle_scale), self.border_color)
+            gfxdraw.aacircle(self.board_surf, x, y, int(radius * (1 - (1 - self.circle_scale) * 2)), color)
+            gfxdraw.filled_circle(self.board_surf, x, y, int(radius * (1 - (1 - self.circle_scale) * 2)), color)
+
+    def draw_board(self, no_draw_pts: list[tuple[int, int]] = None) -> None:
+        self.board_surf.fill(self.background_color["board"])
+
+        for row in range(self.board.rows):
+            for col in range(self.board.cols):
+                if no_draw_pts is not None and (col, row) in no_draw_pts:
+                    continue
+                color_index = self.board.board[row][col]
+                if color_index < 0:
+                    continue
+                pos = self.board_pos_to_win_pos(col, row)
+                self.draw_circle(pos[0], pos[1], self.colors[color_index])
+
+    def draw_buttons(self, texts, y, y_separation, surface_name) -> None:
         surface = getattr(self, f"{surface_name}_surf")
         height = (self.char_height + self.char_sep_height) * 2
         for text in texts:
@@ -354,47 +383,12 @@ class Match3GUI:
                 )
                 self.active_widgets[button_name] = button
             self.active_widgets[button_name].draw()
-            y += (self.char_height + self.char_sep_height) * separation
-
-    def draw_main_menu(self) -> None:
-        self.game_surf.fill(self.background_color["game"])
-
-        #texts = ["NEW GAME", "HIGH SCORES", "PREFERENCES", "ABOUT", "EXIT"]
-        texts = ["NEW GAME", "ABOUT", "EXIT"]
-        if self.game_state == GameState.PAUSED:
-            texts = ["RESUME GAME"] + texts
-        y = (self.game_surf.get_height() - (len(texts) * (self.char_height + self.char_sep_height) * 3.5 - (self.char_height + self.char_sep_height) * 2)) / 2
-        self.draw_buttons(texts, y, 3.5, "game")
-
-    def draw_circle(self, x, y, color, radius = None) -> None:
-        if radius is None:
-            radius = self.circle_radius
-        if color != (0, 0, 0):
-            gfxdraw.aacircle(self.board_surf, x, y, int(radius * self.circle_scale), color)
-            gfxdraw.filled_circle(self.board_surf, x, y, int(radius * self.circle_scale), color)
-        else:
-            gfxdraw.aacircle(self.board_surf, x, y, int(radius * self.circle_scale), self.border_color)
-            gfxdraw.filled_circle(self.board_surf, x, y, int(radius * self.circle_scale), self.border_color)
-            gfxdraw.aacircle(self.board_surf, x, y, int(radius * (1 - (1 - self.circle_scale) * 2)), color)
-            gfxdraw.filled_circle(self.board_surf, x, y, int(radius * (1 - (1 - self.circle_scale) * 2)), color)
-
-    def draw_board(self, no_draw_pts: list[tuple[int, int]] = None) -> None:
-        self.board_surf.fill(self.background_color["board"])
-
-        for row in range(self.board.rows):
-            for col in range(self.board.cols):
-                if no_draw_pts is not None and (col, row) in no_draw_pts:
-                    continue
-                color_index = self.board.board[row][col]
-                if color_index < 0:
-                    continue
-                pos = self.board_pos_to_win_pos(col, row)
-                self.draw_circle(pos[0], pos[1], self.colors[color_index])
+            y += height + (self.char_height + self.char_sep_height) * y_separation
 
     def draw_sidebar(self) -> None:
         self.sidebar_surf.fill(self.background_color["sidebar"])
 
-        y = self.sidebar_surf.get_height() * 0.2
+        y = (self.sidebar_surf.get_height() - (self.char_height + self.char_sep_height) * 13) / 2
         for i, text in enumerate(("SCORE", str(self.score), "TIME LEFT", str(self.time_left_sec))):
             if i == 2:
                 y += self.char_height + self.char_sep_height
@@ -421,49 +415,28 @@ class Match3GUI:
                 self.curr_plus_score_ani_time = pygame.time.get_ticks() - self.plus_score_ani_time_start
             y += self.char_height + self.char_sep_height
 
-        y += (self.char_height + self.char_sep_height) * 2
+        y += (self.char_height + self.char_sep_height) * 3
 
         texts = ("PAUSE", "HINT")
-        self.draw_buttons(texts, y, 3, "sidebar")
+        self.draw_buttons(texts, y, 1, "sidebar")
 
-    def draw_ended(self) -> None:
+    def draw_main_menu(self) -> None:
         self.game_surf.fill(self.background_color["game"])
 
-        y = self.game_surf.get_height() * 0.3
-        for text in ("TIME'S UP!", "YOUR SCORE:", str(self.score)):
-            width = len(text) * self.char_width
-            x = (self.game_surf.get_width() - width) / 2
-            label = self.font.render(text, True, self.button_text_color)
-            self.game_surf.blit(label, (x, y))
-            y += (self.char_height + self.char_sep_height) * 1.5
+        texts = ["NEW GAME", "HIGH SCORES", "PREFERENCES", "ABOUT", "EXIT"]
+        if self.game_state == GameState.PAUSED:
+            texts = ["RESUME GAME"] + texts
+        y = (self.game_surf.get_height() - len(texts) * (self.char_height + self.char_sep_height) * 3.5 + (self.char_height + self.char_sep_height) * 1.5) / 2
+        self.draw_buttons(texts, y, 1.5, "game")
 
-        y += (self.char_height + self.char_sep_height) * 2
-
-        texts = ("CONTINUE",)
-        self.draw_buttons(texts, y, 3, "game")
-
-    def draw_about(self) -> None:
+    def draw_choosesize(self) -> None:
         self.game_surf.fill(self.background_color["game"])
 
-        y = self.game_surf.get_height() * 0.3
-        for text in ("MATCH3PY", "AUTHOR: TOMAS GONZALEZ ARAGON"):
-            width = len(text) * self.char_width
-            x = (self.game_surf.get_width() - width) / 2
-            label = self.font.render(text, True, self.button_text_color)
-            self.game_surf.blit(label, (x, y))
-            y += (self.char_height + self.char_sep_height) * 4
-
-        texts = ("BACK",)
-        self.draw_buttons(texts, y, 3, "game")
-
-    def draw_choose(self) -> None:
-        self.game_surf.fill(self.background_color["game"])
-
-        y = self.game_surf.get_height() * 0.7
+        y = (self.game_surf.get_height() - (self.char_height + self.char_sep_height) * 2) / 2
         texts = ("START",)
-        self.draw_buttons(texts, y, 3, "game")
+        self.draw_buttons(texts, y, 0, "game")
 
-        y = self.game_surf.get_height() * 0.1
+        y = (self.game_surf.get_height() - (len(self.board_sizes) + 1) * (self.char_height + self.char_sep_height) * 2) / 2
         text = "Choose Board Size"
         height = (self.char_height + self.char_sep_height) * 2
         width = (len(text) + 4) * self.char_width
@@ -494,17 +467,35 @@ class Match3GUI:
         # FIXME: When window is resized dropdown is regenerated and loses its current selection.
         self.active_widgets[dropdown_name].draw()
 
+    def draw_ended(self) -> None:
+        self.game_surf.fill(self.background_color["game"])
+
+        y = (self.game_surf.get_height() - (self.char_height + self.char_sep_height) * 8) / 2
+        for i, text in enumerate(("TIME'S UP!", "YOUR SCORE:", str(self.score))):
+            width = len(text) * self.char_width
+            x = (self.game_surf.get_width() - width) / 2
+            label = self.font.render(text, True, self.button_text_color)
+            self.game_surf.blit(label, (x, y))
+            y += (self.char_height + self.char_sep_height)
+            if i == 0:
+                y += (self.char_height + self.char_sep_height) * 2
+
+        y += (self.char_height + self.char_sep_height) * 2
+
+        texts = ("CONTINUE",)
+        self.draw_buttons(texts, y, 0, "game")
+
     def draw_enterhighscore(self ) -> None:
         self.game_surf.fill(self.background_color["game"])
 
-        y = self.game_surf.get_height() * 0.2
+        y = (self.game_surf.get_height() - (self.char_height + self.char_sep_height) * 11) / 2
         text = "HIGH SCORE ACHIEVED!"
         width = len(text) * self.char_width
         x = (self.game_surf.get_width() - width) / 2
         label = self.font.render(text, True, self.button_text_color)
         self.game_surf.blit(label, (x, y))
 
-        y += (self.char_height + self.char_sep_height) * 4
+        y += (self.char_height + self.char_sep_height) * 3
 
         text = "Enter your name:"
         width = len(text) * self.char_width
@@ -514,7 +505,7 @@ class Match3GUI:
 
         y += (self.char_height + self.char_sep_height) * 2
 
-        width = 16 * self.char_width
+        width = 26 * self.char_width
         height = (self.char_height + self.char_sep_height) * 2
         x = (self.game_surf.get_width() - width) / 2 + self.game_surf.get_abs_offset()[0]
         y_abs = y + self.game_surf.get_abs_offset()[1]
@@ -539,25 +530,52 @@ class Match3GUI:
         y += (self.char_height + self.char_sep_height) * 4
 
         texts = ("OK",)
+        self.draw_buttons(texts, y, 0, "game")
+
+    def draw_highscores(self) -> None:
+        pass
+
+    def draw_preferences(self) -> None:
+        pass
+
+    def draw_about(self) -> None:
+        self.game_surf.fill(self.background_color["game"])
+
+        y = self.game_surf.get_height() * 0.3
+        for text in ("MATCH3PY", "AUTHOR: TOMAS GONZALEZ ARAGON"):
+            width = len(text) * self.char_width
+            x = (self.game_surf.get_width() - width) / 2
+            label = self.font.render(text, True, self.button_text_color)
+            self.game_surf.blit(label, (x, y))
+            y += (self.char_height + self.char_sep_height) * 4
+
+        texts = ("BACK",)
         self.draw_buttons(texts, y, 3, "game")
 
     def draw_screen(self) -> None:
         self.screen_surf.fill(self.background_color["screen"])
-        if self.game_state == GameState.MAINMENU or self.game_state == GameState.PAUSED:
-            self.draw_main_menu()
-        elif self.game_state == GameState.RUNNING:
+
+        if self.game_state == GameState.RUNNING:
             self.draw_board()
             self.draw_sidebar()
+        elif self.game_state == GameState.MAINMENU or self.game_state == GameState.PAUSED:
+            self.draw_main_menu()
+        elif self.game_state == GameState.CHOOSESIZE:
+            self.draw_choosesize()
         elif self.game_state == GameState.ENDED:
             self.draw_ended()
-        elif self.game_state == GameState.CHOOSESIZE:
-            self.draw_choose()
-        elif self.game_state == GameState.ABOUT:
-            self.draw_about()
         elif self.game_state == GameState.ENTERHIGHSCORE:
             self.draw_enterhighscore()
+        elif self.game_state == GameState.HIGHSCORES:
+            self.draw_highscores()
+        elif self.game_state == GameState.PREFERENCES:
+            self.draw_preferences()
+        elif self.game_state == GameState.ABOUT:
+            self.draw_about()
 
-    ### Update functions
+    ##################################################
+    # Update functions
+    ##################################################
 
     def update_board(self) -> None:
         self.draw_board()
@@ -572,7 +590,9 @@ class Match3GUI:
         self.draw_screen()
         pygame.display.flip()
 
-    ### On click functions
+    ##################################################
+    # On click functions
+    ##################################################
 
     def new_game_clicked(self) -> None:
         self.game_state = GameState.CHOOSESIZE
@@ -600,22 +620,8 @@ class Match3GUI:
         self.update_screen()
         self.time_start = pygame.time.get_ticks()
 
-    def high_scores_clicked(self) -> None:
-        print(f"High Scores Clicked")
-        #self.update_screen()
-
-    def preferences_clicked(self) -> None:
-        print(f"Preferences Clicked")
-        #self.update_screen()
-
-    def about_clicked(self) -> None:
-        self.prev_state = self.game_state
-        self.game_state = GameState.ABOUT
-        self.update_screen()
-
-    def back_clicked(self) -> None:
-        self.game_state = self.prev_state
-        self.update_screen()
+    def hint_clicked(self) -> None:
+        self.hint = True
 
     def pause_clicked(self) -> None:
         self.pause = True
@@ -625,15 +631,12 @@ class Match3GUI:
         self.update_screen()
         self.time_paused += pygame.time.get_ticks() - self.pause_time
 
-    def hint_clicked(self) -> None:
-        self.hint = True
-
     def continue_clicked(self) -> None:
         min_hs = 0
         hs = self.high_scores.get(f"{self.board.cols}x{self.board.rows}", list())
         if len(hs) > 0:
             min_hs = min([ns[1] for ns in hs])
-        if self.score > min_hs or len(hs) < 10:
+        if self.score > 0 and (self.score > min_hs or len(hs) < 10):
             self.game_state = GameState.ENTERHIGHSCORE
         else:
             self.game_state = GameState.MAINMENU
@@ -641,9 +644,9 @@ class Match3GUI:
 
     def ok_clicked(self) -> None:
         name = self.active_widgets["high_score_name"].getText()
+        # TODO: Sanitize name.
         if len(name) == 0:
             return
-        # TODO: Sanitize name (length, valid characters). Maybe this is done here, maybe it is done as the text is being introduced.
         hs = self.high_scores.get(f"{self.board.cols}x{self.board.rows}", list())
         hs.append([name, self.score])
         hs.sort(key=lambda d: d[1], reverse=True)
@@ -655,11 +658,42 @@ class Match3GUI:
         self.game_state = GameState.MAINMENU
         self.update_screen()
 
+    def high_scores_clicked(self) -> None:
+        print(f"High Scores Clicked")
+        # TODO: Implement show high scores
+        # self.prev_state = self.game_state
+        # self.game_state = GameState.HIGHSCORES
+        # self.update_screen()
+
+    def preferences_clicked(self) -> None:
+        print(f"Preferences Clicked")
+        # TODO: Implement preferences
+        # self.prev_state = self.game_state
+        # self.game_state = GameState.HIGHSCORES
+        # self.update_screen()
+
+    def save_clicked(self) -> None:
+        print(f"Save Clicked")
+        # TODO: Save preferences to file
+        # self.game_state = self.prev_state
+        # self.update_screen()
+
+    def about_clicked(self) -> None:
+        self.prev_state = self.game_state
+        self.game_state = GameState.ABOUT
+        self.update_screen()
+
+    def back_clicked(self) -> None:
+        self.game_state = self.prev_state
+        self.update_screen()
+
     def exit_clicked(self) -> None:
         pygame.quit()
         exit()
 
-    ### Helper functions
+    ##################################################
+    # Helper functions
+    ##################################################
 
     def win_pos_to_board_pos(self, win_pos_x: int, win_pos_y: int, relative_to_window: bool = False) -> tuple[int, int]:
         if relative_to_window:
@@ -692,20 +726,22 @@ class Match3GUI:
             points_in_line[col] = points_in_line.get(col, 0) + 1
         return max(points_in_line.values())
 
-    ### Other functions
+    ##################################################
+    # Other functions
+    ##################################################
 
     def resize_surfaces(self) -> None:
         # Calculate new screen size
         sw, sh = self.screen_surf.get_size()
         gw, gh = sw, sh
-        self.game_surf_pos = [0, 0]
+        gx, gy = 0, 0
         if sw / sh > self.game_ratio:
             gw = sh * self.game_ratio
-            self.game_surf_pos[0] = (sw - gw) / 2
+            gx = (sw - gw) / 2
         else:
             gh = sw / self.game_ratio
-            self.game_surf_pos[1] = (sh - gh) / 2
-        self.game_surf = self.screen_surf.subsurface((self.game_surf_pos[0], self.game_surf_pos[1], gw, gh))
+            gy = (sh - gh) / 2
+        self.game_surf = self.screen_surf.subsurface((gx, gy, gw, gh))
         # Calculate and update new board size and new circle radius
         pos = gh * (1 - self.board_scale) / 2
         side = gh * self.board_scale
@@ -724,7 +760,9 @@ class Match3GUI:
         # Clear active widgets to force a re-draw
         self.active_widgets = {}
 
-    ### Process events functions
+    ##################################################
+    # Process events functions
+    ##################################################
 
     def enterhighscore_process_events(self, events, **kwargs) -> bool:
         self.active_widgets["high_score_name"].listen(events)
@@ -733,7 +771,7 @@ class Match3GUI:
 
     def choosesize_process_events(self, events, **kwargs) -> bool:
         self.active_widgets["choose_board_size"].listen(events)
-        self.draw_choose()
+        self.draw_choosesize()
         if self.active_widgets["choose_board_size"].dropped:
             self.active_widgets["start"].hide()
         else:
@@ -865,7 +903,9 @@ class Match3GUI:
 
         return False
 
-    ### Main game loop functions
+    ##################################################
+    # Main game loop functions
+    ##################################################
 
     def running(self) -> None:
         # Let the computer play (for debug)
