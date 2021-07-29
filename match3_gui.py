@@ -68,7 +68,7 @@ class Match3GUI:
     min_char_width = 13.8
     min_char_height = 13.8
     min_char_sep_height = min_char_height / 2
-    time_init = 60000
+    time_init = 6000
     board_sizes = list(range(5, 14))
     high_scores_filename = "high_scores.json"
     high_scores_schema = '''
@@ -470,7 +470,7 @@ class Match3GUI:
     def draw_ended(self) -> None:
         self.game_surf.fill(self.background_color["game"])
 
-        y = (self.game_surf.get_height() - (self.char_height + self.char_sep_height) * 8) / 2
+        y = (self.game_surf.get_height() - (self.char_height + self.char_sep_height) * 9) / 2
         for i, text in enumerate(("TIME'S UP!", "YOUR SCORE:", str(self.score))):
             width = len(text) * self.char_width
             x = (self.game_surf.get_width() - width) / 2
@@ -541,7 +541,7 @@ class Match3GUI:
     def draw_about(self) -> None:
         self.game_surf.fill(self.background_color["game"])
 
-        y = self.game_surf.get_height() * 0.3
+        y = (self.game_surf.get_height() - (self.char_height + self.char_sep_height) * 10) / 2
         for text in ("MATCH3PY", "AUTHOR: TOMAS GONZALEZ ARAGON"):
             width = len(text) * self.char_width
             x = (self.game_surf.get_width() - width) / 2
@@ -976,7 +976,6 @@ class Match3GUI:
             self.game_state = GameState.PAUSED
             self.update_screen()
             self.pause_time = pygame.time.get_ticks()
-
 
     def run(self) -> None:
         # Read high scores file
