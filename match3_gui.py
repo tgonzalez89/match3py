@@ -986,11 +986,11 @@ class Match3GUI:
 
     def running(self) -> None:
         # Let the computer play (for debug)
-        play = self.board.find_better_play()
-        if len(play) > 0:
-            (swap_points, groups) = play
-            self.animate_swap(swap_points[0], swap_points[1])
-            self.board.swap(swap_points[0], swap_points[1])
+        # play = self.board.find_better_play()
+        # if len(play) > 0:
+        #     (swap_points, groups) = play
+        #     self.animate_swap(swap_points[0], swap_points[1])
+        #     self.board.swap(swap_points[0], swap_points[1])
 
         # Find all the match3 groups and update the board state by
         # clearing them and then filling the board with new tiles from the top
