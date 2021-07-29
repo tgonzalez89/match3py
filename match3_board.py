@@ -188,8 +188,14 @@ class Match3Board:
         score = 0
         for group in groups:
             score += len(group)
-            score += len(group) - 3
-        score += len(groups) - 1
+            bonus = 0
+            for _ in range(len(group) - 3):
+                bonus += 1
+                score += bonus
+        group_bonus = 0
+        for _ in range(len(groups) - 1):
+            group_bonus += 1
+            score += group_bonus
         return score
 
     def find_better_play(self) -> tuple[tuple[tuple[int, int], tuple[int, int]], list[list[tuple[int, int]]]]:
@@ -211,7 +217,7 @@ class Match3Board:
                             groups.append(group)
                     self.swap(*swap_points)
                     score = self.calc_score(groups)
-                    if score > best_score:
+                    if score >= best_score:
                         best_score = score
                         best_play = (swap_points, groups)
         return best_play

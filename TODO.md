@@ -16,3 +16,4 @@
     * Timer about to run out
   * [ ] Preferences button in the main menu to turn on/off background music and sound effects
     * Save preferences to a file (json)
+* [ ] Best bot: Create a find_best_play function that takes into account the results after the tiles drop down

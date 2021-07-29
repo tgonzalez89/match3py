@@ -664,7 +664,12 @@ class Match3GUI:
         size = self.active_widgets["choose_board_size"].getSelected()
         if size is None:
             return
-        self.board = Match3Board(size, size, size-1)
+        num_values = size - 1
+        if size > 7:
+            num_values -= 1
+        if size > 10:
+            num_values -= 1
+        self.board = Match3Board(size, size, num_values)
         self.score = 0
         self.time_left = self.time_init
         self.time_score = 0
@@ -981,23 +986,30 @@ class Match3GUI:
 
     def running(self) -> None:
         # Let the computer play (for debug)
-        # play = self.board.find_better_play()
-        # if len(play) > 0:
-        #     (swap_points, groups) = play
-        #     self.animate_swap(swap_points[0], swap_points[1])
-        #     self.board.swap(swap_points[0], swap_points[1])
+        play = self.board.find_better_play()
+        if len(play) > 0:
+            (swap_points, groups) = play
+            self.animate_swap(swap_points[0], swap_points[1])
+            self.board.swap(swap_points[0], swap_points[1])
 
         # Find all the match3 groups and update the board state by
         # clearing them and then filling the board with new tiles from the top
         # while shifting down the ones floating
         # Do this until the board state is stabilized
         groups = self.board.get_valid_groups()
+        bonus_score = 0
+        bonus = 0
         while len(groups) > 0:
             # Clear any old plus score in the sidbar
             self.animate_plus_score_prev()
             # Calculate the score from the match3 groups, add extra time poportional to the score
-            self.curr_score = self.board.calc_score(groups)
-            self.curr_time_score = self.curr_score * 100
+            self.curr_score = self.board.calc_score(groups) + bonus_score
+            group_bonus_score = 0
+            group_bonus = 0
+            for _ in range(len(groups) - 1):
+                group_bonus += 1
+                group_bonus_score += group_bonus
+            self.curr_time_score = ((self.curr_score + bonus_score + group_bonus_score) * 100)
             if self.hint_cut_score:
                 self.curr_score //= 2
                 self.curr_time_score = self.curr_score * 100
@@ -1017,6 +1029,8 @@ class Match3GUI:
                 shifted += self.board.populate(rows=[0, 1], no_valid_play_check=False, no_match3_group_check=False)
                 self.animate_shift_down(shifted, self.get_num_vertical_points(points))
             groups = self.board.get_valid_groups()
+            bonus += 1
+            bonus_score += bonus
 
         # Check if there is a valid play, if not, regenerate the board
         play = self.board.find_a_play()
