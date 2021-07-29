@@ -569,8 +569,8 @@ class Match3GUI:
         for i, text in enumerate(("<", ">")):
             width = (len(text) + 2) * self.char_width
             height = (self.char_height + self.char_sep_height) * 5
-            x = {0: self.char_width, 1: self.game_surf.get_width() - width - self.char_width}.get(i)
-            y = (self.game_surf.get_height() - height) / 2 + self.game_surf.get_abs_offset()[1]
+            x = {0: self.char_width, 1: self.game_surf.get_width() - width - self.char_width}.get(i) + self.game_surf.get_abs_offset()[0]
+            y = (self.game_surf.get_height() - height) / 2
             y_abs = y + self.game_surf.get_abs_offset()[1]
             border_thickness = int(2 * self.game_surf.get_width() / self.starting_width)
             if border_thickness < 1:
