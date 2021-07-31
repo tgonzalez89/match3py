@@ -1,6 +1,7 @@
 import json
 import jsonschema
 import math
+import os
 import pygame
 import pygame_widgets as pygamew
 from pygame import gfxdraw
@@ -92,6 +93,27 @@ class Match3GUI:
     '''
     high_scores_schema = json.loads(high_scores_schema)
     high_scores_schema["propertyNames"]["enum"] = [f"{n}x{n}" for n in board_sizes]
+    preferences_filename = "preferences.json"
+    preferences_schema = '''
+    {
+        "type": "object",
+        "properties": {
+            "background_music": {
+                "type": "boolean"
+            },
+            "sound_effects": {
+                "type": "boolean"
+            }
+        },
+        "additionalProperties": false
+    }
+    '''
+    preferences_schema = json.loads(preferences_schema)
+    media_dir = "media"
+    audio_dir = f"{media_dir}/audio"
+    sounds_dir = f"{audio_dir}/sounds"
+    music_dir = f"{audio_dir}/music"
+    background_music_filename = f"{music_dir}/background_music.ogg"
 
     def __init__(self) -> None:
         self.board = None
@@ -127,12 +149,18 @@ class Match3GUI:
         self.game_ended = False
         self.prev_state = None
         self.high_scores_state = 5
+        self.high_scores = {}
+        self.preferences = {}
+        self.sounds = {}
+        self.last_beep_sound_time = 0
 
     ##################################################
     # Animate functions
     ##################################################
 
     def animate_swap(self, board_point1: tuple[int, int], board_point2: tuple[int, int]) -> None:
+        self.play_sound("swap")
+
         board_points = (board_point1, board_point2)
         win_points = (list(self.board_pos_to_win_pos(*board_points[0])), list(self.board_pos_to_win_pos(*board_points[1])))
 
@@ -180,6 +208,8 @@ class Match3GUI:
             pygame.display.flip()
 
     def animate_clear(self, board_points: list[tuple[int, int]], no_more_moves: bool = False) -> None:
+        self.play_sound("match")
+
         win_points = [self.board_pos_to_win_pos(*p) for p in board_points]
 
         target_transparency = 0
@@ -287,6 +317,8 @@ class Match3GUI:
             pygame.display.flip()
 
     def animate_hint(self, board_point1: tuple[int, int], board_point2: tuple[int, int]) -> None:
+        self.play_sound("hint")
+
         board_points = (board_point1, board_point2)
         win_points = (list(self.board_pos_to_win_pos(*board_points[0])), list(self.board_pos_to_win_pos(*board_points[1])))
 
@@ -597,8 +629,41 @@ class Match3GUI:
             self.active_widgets[button_name].draw()
 
     def draw_preferences(self) -> None:
-        # TODO: Implement preferences
-        pass
+        self.game_surf.fill(self.background_color["game"])
+
+        y = (self.game_surf.get_height() - (self.char_height + self.char_sep_height) * 12) / 2
+        height = self.char_height + self.char_sep_height
+        texts = ("Background music", "Sound effects")
+        text_width = max([len(text) for text in texts]) * self.char_width
+        spacing_width = 3 * self.char_width
+        toggle_width = 3 * self.char_width
+        width = text_width + spacing_width + toggle_width
+        x_text = (self.game_surf.get_width() - width) / 2
+        x_toggle = x_text + text_width + spacing_width
+        x_toggle_abs = x_toggle + self.game_surf.get_abs_offset()[0]
+        for text in texts:
+            label = self.font.render(text, True, self.widget_text_color)
+            self.game_surf.blit(label, (x_text, y))
+            y_abs = y + self.game_surf.get_abs_offset()[1]
+            toggle_name = text.lower()
+            toggle_name = toggle_name.replace(' ', '_')
+            if toggle_name not in self.active_widgets:
+                toggle = pygamew.Toggle(
+                    self.screen_surf, int(x_toggle_abs), int(y_abs), int(toggle_width), int(height),
+                    startOn = self.preferences.get(toggle_name, True),
+                    onColour = (0, 255, 0),
+                    offColour = (128, 128, 128),
+                    handleOnColour = (0, 128, 0),
+                    handleOffColour = (64, 64, 64)
+                )
+                self.active_widgets[toggle_name] = toggle
+            self.active_widgets[toggle_name].draw()
+            y += (self.char_height + self.char_sep_height) * 3
+
+        y += (self.char_height + self.char_sep_height) * 4
+
+        texts = ("SAVE",)
+        self.draw_buttons(texts, y, 0, "game")
 
     def draw_about(self) -> None:
         self.game_surf.fill(self.background_color["game"])
@@ -612,12 +677,13 @@ class Match3GUI:
             y += (self.char_height + self.char_sep_height) * 4
 
         texts = ("BACK",)
-        self.draw_buttons(texts, y, 3, "game")
+        self.draw_buttons(texts, y, 0, "game")
 
     def draw_screen(self) -> None:
         self.screen_surf.fill(self.background_color["screen"])
 
         if self.game_state == GameState.RUNNING:
+            self.game_surf.fill(self.background_color["game"])
             self.draw_board()
             self.draw_sidebar()
         elif self.game_state == GameState.MAINMENU or self.game_state == GameState.PAUSED:
@@ -683,6 +749,7 @@ class Match3GUI:
         self.time_paused = 0
         self.pause = False
         self.game_state = GameState.RUNNING
+        self.start_music()
         self.resize_surfaces()
         self.update_screen()
         self.time_start = pygame.time.get_ticks()
@@ -695,6 +762,7 @@ class Match3GUI:
 
     def resume_game_clicked(self) -> None:
         self.game_state = GameState.RUNNING
+        self.start_music()
         self.update_screen()
         self.time_paused += pygame.time.get_ticks() - self.pause_time
 
@@ -703,8 +771,9 @@ class Match3GUI:
         hs = self.high_scores.get(f"{self.board.cols}x{self.board.rows}", list())
         if len(hs) > 0:
             min_hs = min([ns[1] for ns in hs])
-        if self.score > 0 and (self.score > min_hs or len(hs) < 10):
+        if self.score > 0 and (self.score > min_hs or len(hs) < 5):
             self.game_state = GameState.ENTERHIGHSCORE
+            self.play_sound("yay")
         else:
             self.game_state = GameState.MAINMENU
         self.update_screen()
@@ -743,17 +812,17 @@ class Match3GUI:
         self.update_screen()
 
     def preferences_clicked(self) -> None:
-        print(f"Preferences Clicked")
-        # TODO: Implement preferences
-        # self.prev_state = self.game_state
-        # self.game_state = GameState.PREFERENCES
-        # self.update_screen()
+        self.prev_state = self.game_state
+        self.game_state = GameState.PREFERENCES
+        self.update_screen()
 
     def save_clicked(self) -> None:
-        print(f"Save Clicked")
-        # TODO: Save preferences to file
-        # self.game_state = self.prev_state
-        # self.update_screen()
+        for s in ("background_music", "sound_effects"):
+            self.preferences[s] = self.active_widgets[s].value
+        with open(self.preferences_filename, 'w') as f:
+            json.dump(self.preferences, f)
+        self.game_state = self.prev_state
+        self.update_screen()
 
     def about_clicked(self) -> None:
         self.prev_state = self.game_state
@@ -803,6 +872,17 @@ class Match3GUI:
             points_in_line[col] = points_in_line.get(col, 0) + 1
         return max(points_in_line.values())
 
+    def play_sound(self, sound: str) -> None:
+        if self.preferences["sound_effects"] and sound in self.sounds:
+            pygame.mixer.Sound.play(self.sounds[sound])
+
+    def start_music(self) -> None:
+        if self.preferences["background_music"]:
+            try:
+                pygame.mixer.music.play(-1, 0, 1000)
+            except:
+                pass
+
     ##################################################
     # Other functions
     ##################################################
@@ -841,11 +921,6 @@ class Match3GUI:
     # Process events functions
     ##################################################
 
-    def enterhighscore_process_events(self, events, **kwargs) -> bool:
-        self.active_widgets["high_score_name"].listen(events)
-        self.draw_screen()
-        return True
-
     def choosesize_process_events(self, events, **kwargs) -> bool:
         self.active_widgets["choose_board_size"].listen(events)
         self.draw_choosesize()
@@ -870,6 +945,12 @@ class Match3GUI:
                 self.time_left_sec = 0
             self.draw_sidebar()
             update_display = True
+
+        # Play beep sound
+        if self.time_left_sec <= 5:
+            if pygame.time.get_ticks() - self.last_beep_sound_time >= 1000:
+                self.last_beep_sound_time = pygame.time.get_ticks()
+                self.play_sound("beep")
 
         # Remove plus score from sidebar if the ani time is up
         if self.curr_plus_score_ani_time <= self.plus_score_ani_time:
@@ -938,6 +1019,17 @@ class Match3GUI:
                     self.mouse_state = MouseState.WAITING
 
         return update_display
+
+    def enterhighscore_process_events(self, events, **kwargs) -> bool:
+        self.active_widgets["high_score_name"].listen(events)
+        self.draw_screen()
+        return True
+
+    def preferences_process_events(self, events, **kwargs) -> bool:
+        self.active_widgets["background_music"].listen(events)
+        self.active_widgets["sound_effects"].listen(events)
+        self.draw_screen()
+        return True
 
     def process_events(self, fps: int = -1, **kwargs) -> bool:
         # Wait until frame time
@@ -1028,6 +1120,7 @@ class Match3GUI:
                 shifted = self.board.shift_down()
                 shifted += self.board.populate(rows=[0, 1], no_valid_play_check=False, no_match3_group_check=False)
                 self.animate_shift_down(shifted, self.get_num_vertical_points(points))
+            self.play_sound("drop")
             groups = self.board.get_valid_groups()
             bonus += 1
             bonus_score += bonus
@@ -1055,33 +1148,52 @@ class Match3GUI:
         if self.game_ended:
             self.game_ended = False
             self.game_state = GameState.ENDED
+            self.play_sound("end")
+            pygame.mixer.music.fadeout(1000)
             self.update_screen()
         elif self.pause:
             self.pause = False
             self.game_state = GameState.PAUSED
+            self.music_pos = pygame.mixer.music.get_pos()
+            pygame.mixer.music.fadeout(1000)
             self.update_screen()
             self.pause_time = pygame.time.get_ticks()
 
     def run(self) -> None:
-        # Read high scores file
-        try:
-            with open(self.high_scores_filename, 'r') as json_file:
-                self.high_scores = json.load(json_file)
-                try:
-                    jsonschema.validate(self.high_scores, self.high_scores_schema)
-                except jsonschema.ValidationError:
-                    print("ERROR: Invalid json schema for high scores file.")
-                    self.high_scores = dict()
-        except FileNotFoundError:
-            self.high_scores = dict()
+        # Load high scores and preferences
+        for name in ("high_scores", "preferences"):
+            filename = getattr(self, f"{name}_filename")
+            schema = getattr(self, f"{name}_schema")
+            data = dict()
+            try:
+                with open(filename, 'r') as file:
+                    try:
+                        data = json.load(file)
+                        try:
+                            jsonschema.validate(data, schema)
+                        except jsonschema.ValidationError:
+                            print(f"ERROR: In file {filename}: json doesn't conform to schema.")
+                    except json.JSONDecodeError:
+                        print(f"ERROR: In file {filename}: json not valid.")
+            except FileNotFoundError:
+                pass
+            setattr(self, name, data)
 
         pygame.init()
+        pygame.mixer.init()
         self.font = pygame.font.SysFont("monospace", int(self.font_size))
         self.font.set_bold(True)
         self.clock = pygame.time.Clock()
         self.screen_surf = pygame.display.set_mode((self.starting_width, self.starting_height), self.flags, vsync=1)
         self.resize_surfaces()
         self.update_screen()
+
+        # Load audio
+        if os.path.isfile(self.background_music_filename):
+            pygame.mixer.music.load(self.background_music_filename)
+        for filename in os.listdir(self.sounds_dir):
+            sound_name = os.path.splitext(filename)[0]
+            self.sounds[sound_name] = pygame.mixer.Sound(f"{self.sounds_dir}/{filename}")
 
         while True:
             if self.process_events(fps=self.main_loop_refresh_rate, mouse=True):

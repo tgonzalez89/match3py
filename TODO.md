@@ -7,13 +7,16 @@
   * [x] High scores button in the main menu
     * Buttons to go left and right scroll through the high score for each board size
     * Shows the high scores of the smallest board size by default
-* [ ] Audio
-  * [ ] Background music
-  * [ ] Sound effects:
-    * Swap
-    * Match
-    * Shift down (maybe)
-    * Timer about to run out
-  * [ ] Preferences button in the main menu to turn on/off background music and sound effects
+* [x] Audio
+  * [x] Background music
+  * [x] Sound effects:
+    * [x] Swap
+    * [x] Match
+    * [x] Tile reaches bottom
+    * [x] Hint
+    * [x] Timer about to run out (last 5 seconds)
+    * [x] Game ended
+    * [x] High score achieved
+  * [x] Preferences button in the main menu to turn on/off background music and sound effects
     * Save preferences to a file (json)
 * [ ] Best bot: Create a find_best_play function that takes into account the results after the tiles drop down
