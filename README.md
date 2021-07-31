@@ -19,3 +19,7 @@ Install the prerequisites:
 Run the application with the following command:
 
 `python main.py`
+
+## Assets
+
+Download the [media.zip](https://drive.google.com/file/d/1UcG7Up8EMiLBvpSBADCcTt7_rVuJhdmU/view?usp=sharing) file, uncompress it in the same directory as the main.py file.
