@@ -7,6 +7,7 @@ Match 3 game made in Python.
 * [Python](https://www.python.org/downloads) `>=3.9.0`
 * [Pygame](https://pypi.org/project/pygame) `>=2.0.0`
 * [Pygame Widgets](https://pypi.org/project/pygame-widgets) `>=0.6.0`
+* [jsonschema](https://pypi.org/project/jsonschema) `>=3.2.0`
 
 ## Running
 
