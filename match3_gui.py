@@ -873,11 +873,11 @@ class Match3GUI:
         return max(points_in_line.values())
 
     def play_sound(self, sound: str) -> None:
-        if self.preferences["sound_effects"] and sound in self.sounds:
+        if self.preferences.get("sound_effects", True) and sound in self.sounds:
             pygame.mixer.Sound.play(self.sounds[sound])
 
     def start_music(self) -> None:
-        if self.preferences["background_music"]:
+        if self.preferences.get("background_music", True):
             try:
                 pygame.mixer.music.play(-1, 0, 1000)
             except:
@@ -1191,9 +1191,10 @@ class Match3GUI:
         # Load audio
         if os.path.isfile(self.background_music_filename):
             pygame.mixer.music.load(self.background_music_filename)
-        for filename in os.listdir(self.sounds_dir):
-            sound_name = os.path.splitext(filename)[0]
-            self.sounds[sound_name] = pygame.mixer.Sound(f"{self.sounds_dir}/{filename}")
+        if os.path.isdir(self.sounds_dir):
+            for filename in os.listdir(self.sounds_dir):
+                sound_name = os.path.splitext(filename)[0]
+                self.sounds[sound_name] = pygame.mixer.Sound(f"{self.sounds_dir}/{filename}")
 
         while True:
             if self.process_events(fps=self.main_loop_refresh_rate, mouse=True):
