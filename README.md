@@ -23,4 +23,4 @@ Run the application with the following command:
 
 ## Assets
 
-Download the [media.zip](https://drive.google.com/file/d/1UcG7Up8EMiLBvpSBADCcTt7_rVuJhdmU/view?usp=sharing) file, uncompress it in the same directory as the main.py file.
+Download the [match3py_media.zip](https://drive.google.com/file/d/1BjqaYEsukdx5Nd-WBsdqvkzYx7fyaRr6/view?usp=sharing) file, uncompress it in the same directory as the main.py file.
