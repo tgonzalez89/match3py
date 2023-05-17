@@ -19,7 +19,7 @@ Install the prerequisites:
 
 Run the application with the following command:
 
-`python main.py`
+`python match3py.pyw`
 
 ## Assets
 

@@ -1,2 +1,7 @@
 __pycache__
 *.json
+*.spec
+.venv
+build
+dist
+media

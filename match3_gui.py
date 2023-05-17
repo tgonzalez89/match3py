@@ -4,6 +4,7 @@ import math
 import os
 import pygame
 import pygame_widgets as pygamew
+from sys import exit
 from pygame import gfxdraw
 from enum import Enum, auto
 from match3_board import Match3Board
