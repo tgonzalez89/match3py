@@ -65,7 +65,7 @@ class Match3GUI:
     plus_score_blink_ani_time = 100
     ani_fps = 60
     main_loop_refresh_rate = 30
-    flags = pygame.RESIZABLE | pygame.HWSURFACE
+    flags = pygame.RESIZABLE | pygame.HWSURFACE | pygame.NOFRAME
     min_font_size = 20
     min_char_width = 13.8
     min_char_height = 13.8
@@ -1188,7 +1188,9 @@ class Match3GUI:
         icon = pygame.image.load("icon32x32.png")
         pygame.display.set_icon(icon)
         pygame.display.set_caption("MATCH3PY")
-        self.screen_surf = pygame.display.set_mode((self.starting_width, self.starting_height), self.flags, vsync=1)
+        os.environ['SDL_VIDEO_CENTERED'] = '1'
+        display_info = pygame.display.Info()
+        self.screen_surf = pygame.display.set_mode((display_info.current_w, display_info.current_h), self.flags, vsync=1)
         self.resize_surfaces()
         self.update_screen()
 
